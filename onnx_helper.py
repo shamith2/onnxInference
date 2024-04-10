@@ -1,6 +1,5 @@
 # This script contains functions for converting PyTorch model to ONNX, running ONNX models using ONNXRuntime, Quantizing and Performance Analysis of ONNX nodels
 # Version: v1.0.0
-# Tested on Hawk Point
 
 from collections import deque
 from datetime import datetime
@@ -23,7 +22,6 @@ import onnx
 import onnxruntime as ort
 from onnxruntime.quantization import QuantFormat, QuantType, CalibrationDataReader
 from onnxruntime.quantization.shape_inference import quant_pre_process
-import vai_q_onnx
 
 import torch
 from typing import Optional, List
@@ -105,11 +103,11 @@ class ImageCalibrationData(CalibrationDataReader):
         shape[1], shape[3] = shape[3], shape[1]
 
         return shape
-    
+
     def is_nhwc(self, shape):
         if shape[1] > shape[3] and shape[2] > shape[3]:
             return True
-        
+
         else:
             return False
 
@@ -188,14 +186,19 @@ def generate_random_data(
 
 
 class ONNXInference:
-    def __init__(self, model_name: str = None, in_dir: bool = False, metadata: str = 'test'):
+    def __init__(
+            self,
+            model_name: str = None,
+            metadata: str = 'test',
+            model_path: Optional[str] = None,
+            mode: Optional[str] = None
+    ):
         if model_name is None:
             raise Exception("model_name cannot be None")
 
         self.model_name = str(model_name)
 
-        self.in_dir = in_dir
-        self.working_dir = os.getcwd() if self.in_dir else Path(__file__).parent.resolve()
+        self.working_dir = Path(__file__).parent.resolve()
 
         self.workspace = os.path.join(self.working_dir, 'onnx')
         self.cache_dir = os.path.join(self.workspace, '.cache')
@@ -225,6 +228,38 @@ class ONNXInference:
                   self.ryzen_ai_results_dir, self.fp32_prof_dir, self.quant_prof_dir, self.ryzen_ai_prof_dir]:
             os.makedirs(i, exist_ok=True)
 
+        # copy onnx model or cache to appropriate directory if model_dir is provided
+        if model_path is not None and os.path.exists(model_path):
+            model_path = os.path.realpath(model_path)
+
+            if mode not in ['fp32', 'int8', 'ryzen-ai', 'cache']:
+                raise Exception("mode has to be either fp32 or int8 or ryzen-ai or cache")
+
+            if mode == 'fp32':
+                to_path = os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
+                logging.info("Copying {} to {}\n".format(model_path, to_path))
+                shutil.copy2(model_path, to_path)
+
+            elif mode == 'int8':
+                to_path = os.path.join(self.quant_onnx_dir, self.model_name + '_int8.onnx')
+                logging.info("Copying {} to {}\n".format(model_path, to_path))
+                shutil.copy2(model_path, to_path)
+
+            elif mode == 'ryzen-ai':
+                to_path = os.path.join(self.ryzen_ai_onnx_dir, self.model_name + '_int8.onnx')
+                logging.info("Copying {} to {}\n".format(model_path, to_path))
+                shutil.copy2(model_path, to_path)
+
+            # if mode is cache, then model_path is a directory
+            else:
+                if os.path.isdir(model_path):
+                    to_path = os.path.join(self.cache_dir, self.model_name + metadata)
+                    logging.info("Copying {} to {}\n".format(model_path, to_path))
+                    shutil.copytree(model_path, to_path, copy_function=shutil.copy2, dirs_exist_ok=True)
+                
+                else:
+                    raise Exception("If mode is cache, then model_path has to be a directory")
+
     def convert_torch_to_onnx(self,
                               model: torch.nn.Module,
                               pass_inputs: bool = False,
@@ -244,7 +279,7 @@ class ONNXInference:
             self.use_external_data = use_external_data
 
             if self.opset_version > 17:
-                logger.warning("opset version cannot be greater than 17 if not using torch dynamo. Setting opset "
+                logger.warning("Opset version cannot be greater than 17 if not using torch dynamo. Setting opset "
                                "version to 17 ...\n")
                 self.opset_version = 17
 
@@ -355,20 +390,12 @@ class ONNXInference:
 
     def quantize(
             self,
-            model_path: str = None,
             shape_infer: bool = True,
             external_data_format: bool = False
     ) -> int:
-        if model_path is None or not os.path.exists(model_path):
-            raise Exception("Cannot find {} in {}".format(self.model_name, model_path))
+        import vai_q_onnx
 
-        input_model_path = os.path.realpath(model_path) if model_path is not None \
-            else os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
-
-        # if model_path is not None or not os.path.exists(input_model_path):
-        #     model_path = os.path.realpath(model_path)
-        #     logging.warning("copying {} to {}\n".format(model_path, input_model_path))
-        #     shutil.copy2(model_path, input_model_path)
+        input_model_path = os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
 
         # configure model paths
         if shape_infer:
@@ -456,44 +483,34 @@ class ONNXInference:
                         instance_count: int = 1,
                         layout: Optional[str] = '1x4',
                         config_file_name: Optional[str] = None,
-                        num_input_data: Optional[int] = 100,  # model_inputs: Optional[torch.Tensor] = None,
+                        compile_only: bool = False,
+                        num_input_data: Optional[int] = 100,
                         benchmark: bool = False,
                         profiling: bool = False,
-                        compile_only: bool = False,
+                        disable_thread_spinning: bool = True,
                         runtime: int = 60,
-                        iterations: Optional[int] = 1000,
+                        iterations: Optional[int] = None,
                         num_threads: int = 8,
-                        inf_type: str = 'fp32',
+                        inf_mode: str = 'fp32',
                         verbosity: int = 3,
                         intra_threads: int = 1
-                        ):
-        if inf_type == 'ryzen_ai':
-            onnx_model_path = os.path.join(self.working_dir, self.model_name + '_int8.onnx') if self.in_dir \
-                else os.path.join(self.ryzen_ai_onnx_dir, self.model_name + '_int8.onnx')
+    ):
+        if inf_mode == 'ryzen-ai':
+            onnx_model_path = os.path.join(self.ryzen_ai_onnx_dir, self.model_name + '_int8.onnx')
             results_dir = self.ryzen_ai_results_dir
             prof_dir = self.ryzen_ai_prof_dir
 
-        elif inf_type == 'int8':
-            onnx_model_path = os.path.join(self.working_dir, self.model_name + '_int8.onnx') if self.in_dir \
-                else os.path.join(self.quant_onnx_dir, self.model_name + '_int8.onnx')
+        elif inf_mode == 'int8':
+            onnx_model_path = os.path.join(self.quant_onnx_dir, self.model_name + '_int8.onnx')
             results_dir = self.quant_results_dir
             prof_dir = self.quant_prof_dir
 
         else:
-            onnx_model_path = os.path.join(self.working_dir, self.model_name + '.onnx') if self.in_dir \
-                else os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
+            onnx_model_path = os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
             results_dir = self.fp32_results_dir
             prof_dir = self.fp32_prof_dir
 
-        # if model_path is None and not os.path.exists(model_path):
-        #     raise Exception("Cannot find {} in {}".format(self.model_name, model_path))
-
-        # if model_path is not None or not os.path.exists(onnx_model_path):
-        #     model_path = os.path.realpath(model_path)
-        #     logging.warning("copying {} to {}\n".format(model_path, onnx_model_path))
-        #     shutil.copy2(model_path, onnx_model_path)
-
-        self.instance_count = 1 if profiling else instance_count
+        self.instance_count = instance_count
         self.runtime = runtime
 
         sess_options = ort.SessionOptions()
@@ -504,7 +521,10 @@ class ONNXInference:
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
         logging.info("Disabling thread spinning ...\n")
-        sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        if disable_thread_spinning:
+            sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        else:
+            sess_options.add_session_config_entry("session.intra_op.allow_spinning", "1")
 
         if benchmark:
             sess_options.log_severity_level = 3
@@ -515,17 +535,17 @@ class ONNXInference:
 
         logger.info("ONNX Model Path: {}\n".format(onnx_model_path))
 
-        # ryzen_ai := int8 on ryzen ai processor
-        if inf_type == 'ryzen_ai':
+        # ryzen-ai := int8 on ryzen ai processor
+        if inf_mode == 'ryzen-ai':
             self.config_file_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], 'voe-4.0-win_amd64')
             self.xclbin_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], 'voe-4.0-win_amd64')
 
             if layout == '1x4':
-                os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2_Nx4_Overlay"
+                os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_Nx4_Overlay"
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, '1x4.xclbin')
 
             elif layout == '4x4':
-                os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2_4x4_Overlay"
+                os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_4x4_Overlay"
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, '4x4.xclbin')
 
             else:
@@ -538,6 +558,8 @@ class ONNXInference:
 
             if config_file_name is None:
                 config_file_name = 'vaip_config.json'
+            else:
+                config_file_name = config_file_name + '.json'
 
             config_file_path = os.path.join(self.config_file_dir, str(config_file_name))
 
@@ -597,7 +619,7 @@ class ONNXInference:
             # wait(tasks)
 
         task = functools.partial(self.start_processing_iter, ort_session, output_feed)
-        
+
         logger.info("Starting ONNXRuntime Benchmark...\n")
 
         # run benchmark inference
@@ -607,9 +629,9 @@ class ONNXInference:
             while time.perf_counter() - start <= self.runtime:
                 for result in threads.map(task, task_queue):
                     results.append(result)
-            
+
             # threads.shutdown(wait=True, cancel_futures=True)
- 
+
         if profiling:
             prof_file = ort_session.end_profiling()
             logger.info("Successfully completed ONNXRuntime Profiling!!\n")
@@ -617,14 +639,17 @@ class ONNXInference:
         logger.info("Successfully completed ONNXRuntime Benchmark!!\n")
 
         throughput, result_data = self.get_latency_result(list(results))
-        
+
         _datetime = datetime.now().strftime("%m%d%Y%H%M%S")
 
-        metadata = '{}_onnx_{}n_{}sec_{}i_{}nt_{}it_{}l_{}_{}fps_{}'.format(self.model_name, str(num_input_data),
-                                                                             str(self.runtime),
-                                                                             str(self.instance_count),
-                                                                             str(num_threads), str(intra_threads),
-                                                                             str(layout), str(config_file_name)[:-5], str(throughput), _datetime)
+        metadata = '{}_onnx_{}n_{}sec_{}i_{}nt_{}it_{}dts_{}l_{}_{}fps_{}'.format(self.model_name, str(num_input_data),
+                                                                                  str(self.runtime),
+                                                                                  str(self.instance_count),
+                                                                                  str(num_threads), str(intra_threads),
+                                                                                  str(int(disable_thread_spinning)),
+                                                                                  str(layout),
+                                                                                  str(config_file_name)[:-5],
+                                                                                  str(throughput), _datetime)
 
         result_log = os.path.join(results_dir, metadata + '.json')
 
@@ -638,7 +663,7 @@ class ONNXInference:
                 "Saved profiling log in {}\n".format(os.path.join(prof_dir, prof_file[:-5] + metadata + '.json')))
 
         logger.info("Saved results log in {}\n".format(result_log))
-        
+
         gc.collect()
 
         return 0
@@ -646,12 +671,12 @@ class ONNXInference:
     # adapted from https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/transformers/benchmark_helper.py
     def get_latency_result(self, latency_list: list, batch_size: int = 1):
         latency_list_ms = np.array(latency_list, dtype=np.float64) * 1000
-        
+
         inferences = len(latency_list_ms)
         latency_ms = np.sum(latency_list_ms) / inferences
         latency_variance = np.var(latency_list_ms, dtype=float)
         throughput = inferences * batch_size / float(self.runtime)
-        
+
         uniq, inv = np.unique(np.round(latency_list_ms, 2), return_inverse=True)
         mode_latency_ms = uniq[np.bincount(inv).argmax()]
 
