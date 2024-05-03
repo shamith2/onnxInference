@@ -27,59 +27,7 @@ def preprocess_files(models_dir, workspace, model_type, args=None):
     if os.path.exists(os.path.join(workspace, model_type + '.txt')):
         return 0
 
-    if model_type == 'win24_shell':
-        model_names = []
-        for root, dirs, files in os.walk(models_dir, topdown=True):
-            for f in files:
-                model_names.append(f[:-5].lower())
-
-                p_ort_inf = ONNXInference(model_name=f[:-5].lower(), metadata='test', model_path=os.path.join(root, f),
-                                          mode='ryzen-ai')
-
-                for (l, cf) in itertools.product(('1x4', '4x4'), ('vaip_config', 'vaip_config_opt')):
-                    _p = Process(target=p_ort_inf.start_inference, args=(1,
-                                                                         l,
-                                                                         cf,
-                                                                         True,
-                                                                         1,
-                                                                         False,
-                                                                         False,
-                                                                         False,
-                                                                         None,
-                                                                         None,
-                                                                         1,
-                                                                         'ryzen-ai',
-                                                                         3,
-                                                                         1))
-
-                    _p.start()
-
-                    _p.join()
-
-                    _p.terminate()
-
-                    _p.close()
-
-                    time.sleep(5)
-
-        with open(os.path.join(workspace, model_type + '.txt'), 'w') as f:
-            for mn in model_names:
-                f.write(mn + '\n')
-
-    elif model_type == 'win24_mep':
-        model_names = []
-        for root, dirs, files in os.walk(models_dir, topdown=True):
-            for d in dirs:
-                model_names.append(d.lower())
-
-                # _ = ONNXInference(model_name=d.lower(), metadata='_' + args.config_file + '_' + args.layout, model_path=os.path.join(root, d),
-                #                   mode='cache')
-
-        with open(os.path.join(workspace, model_type + '.txt'), 'w') as f:
-            for mn in model_names:
-                f.write(mn + '\n')
-
-    elif model_type == 'procyon-v1.1' or model_type == 'procyon-v1.1-rc2':
+    if model_type == 'procyon-v1.1' or model_type == 'procyon-v1.1-rc2':
         model_names = []
         models_path = []
         for root, dirs, files in os.walk(models_dir, topdown=True):
@@ -336,7 +284,7 @@ if __name__ == '__main__':
                              'default: --models deeplabv3 inceptionv4 mobilenetv3 resnet50 yolov3',
                         default=['deeplabv3', 'inceptionv4', 'mobilenetv3', 'resnet50', 'yolov3'])
     parser.add_argument('--model_type', type=str, action='store',
-                        help='type of models. supported: procyon-v1.1, procyon-v1.1-rc2, win24_shell, win24_mep. default: --model_type procyon-v1.1-rc2',
+                        help='type of models. supported: procyon-v1.1, procyon-v1.1-rc2. default: --model_type procyon-v1.1-rc2',
                         default='procyon-v1.1-rc2')
     parser.add_argument('--num_input', '-n', type=int, action='store',
                         help='number of images/inputs to run inference on. default: --num_input 100', default=100)
@@ -384,9 +332,6 @@ if __name__ == '__main__':
     parser.add_argument('--etl', action='store_true',
                         help='if this option is used, collect etl trace',
                         default=False)
-    parser.add_argument('--pipeline', type=str, nargs='+', action='store',
-                        help='which mep v2 pipeline to run',
-                        default=[])
     parser.add_argument('--registry', type=str, action='store',
                         help='which registry keys to change. to change ac power slider to best performance, use --registry ac3. ' +
                              'to set npu driver registry key for manual dpm, use --registry npu0. ' +
@@ -433,218 +378,99 @@ if __name__ == '__main__':
         subprocess.run(['python', 'parse_agm.py', args.metadata, agm_dir, agm_dir], shell=True, capture_output=False)
         sys.exit()
 
-    if args.model_type == 'win24_mep':
-        args.config_file = 'vaip_config'
-        args.layout = '4x4'
-
-    if args.model_type not in ['procyon-v1.1', 'procyon-v1.1-rc2', 'win24_shell', 'win24_mep']:
-        raise Exception("This framework currently only supports procyon-v1.1, procyon-v1.1-rc2, and win24_shell")
+    if args.model_type not in ['procyon-v1.1', 'procyon-v1.1-rc2']:
+        raise Exception("This framework currently only supports procyon-v1.1, procyon-v1.1-rc2")
 
     if args.model_type == 'procyon-v1.1':
         preprocess_files(os.path.join(kwargs['working_dir'], 'procyon-v1.1'), kwargs['working_dir'], args.model_type)
     elif args.model_type == 'procyon-v1.1-rc2':
         preprocess_files(os.path.join(kwargs['working_dir'], 'procyon-v1.1-rc2'), kwargs['working_dir'],
                          args.model_type)
-    elif args.model_type == 'win24_shell':
-        preprocess_files(os.path.join(kwargs['working_dir'], 'QDQ-Models'), kwargs['working_dir'], args.model_type)
-    elif args.model_type == 'win24_mep':
-        preprocess_files(
-            os.path.join(kwargs['working_dir'], 'cache_STRIX_ipu_benchmark_4x4_subgraph500_opt3', 'a1_iputest', 'vaip',
-                         '.cache'), kwargs['working_dir'], args.model_type, args)
     else:
         pass
     
     if args.quantize:
         sys.exit()
 
-    if args.model_type == 'win24_mep' or args.model_type == 'win24_shell':
-        # t_models = []
-        models = []
+    models = args.models
+    for model_dir in args.models:
+        if len(os.listdir(os.path.join(kwargs['working_dir'], 'onnx', 'onnx_models', 'ryzen_ai', model_dir))) == 0:
+            models.remove(model_dir)
 
-        with open(os.path.join(kwargs['working_dir'], args.model_type + '.txt'), 'r') as f:
-            models = f.read().splitlines()
+    # run standalone onnx models
+    for (isc, nt) in list(itertools.product(args.instance_count, args.num_threads)):
+        kwargs['instance_count'] = isc
+        kwargs['num_threads'] = nt
 
-        # for i in range(len(t_models)):
-        #     models.append(t_models[i] + '_' + args.config_file + '_' + args.layout)
+        for i, model_name in enumerate(models):
+            logging.info("Setting system idle for 2 minutes...\n")
+            time.sleep(120)
 
-    else:
-        models = args.models
-        for model_dir in args.models:
-            if len(os.listdir(os.path.join(kwargs['working_dir'], 'onnx', 'onnx_models', 'ryzen_ai', model_dir))) == 0:
-                models.remove(model_dir)
+            kwargs['model_name'] = model_name
 
-    if args.model_type == 'win24_mep':
-        logging.info('Starting win24_mep...\n')
+            ort_inf = ONNXInference(model_name=model_name, metadata=args.metadata)
 
-        if args.pipeline:
-            for pipeline in args.pipeline:
-                logging.info("Setting system idle for 2 minutes...\n")
-                time.sleep(120)
-
-                # if args.agm:
+            if args.agm:
                 agm_dir = os.path.join(kwargs['working_dir'], 'onnx', 'agm_logs', args.metadata)
                 os.makedirs(agm_dir, exist_ok=True)
 
-                agm_outfile = "{}_{}pipeline_{}r_{}s_run1.csv".format(args.metadata, pipeline, 1000, 30)
+                agm_outfile = "{}_{}_onnx_{}_{}n_{}t_{}i_{}nt_{}it_{}dts_run1.csv".format(kwargs['model_name'],
+                                                                                          args.metadata,
+                                                                                          args.config_file,
+                                                                                          args.num_input,
+                                                                                          args.time_limit,
+                                                                                          kwargs['instance_count'],
+                                                                                          kwargs['num_threads'],
+                                                                                          args.intra_threads,
+                                                                                          str(int(
+                                                                                              not args.enable_thread_spinning)))
 
-                command = (
-                            'cd C:\\Users\\Administrator\\Desktop\\onnx_benchmarking_strix\\win24_mep\\mep_workload_app_v0.2 && ' +
-                            'mep_workload_sim.exe -c config_CfG0.json -r 1000 -s 30 -o ' + pipeline)
+            if args.etl:
+                wpr_dir = os.path.join(kwargs['working_dir'], 'onnx', 'etl_traces', args.metadata)
+                os.makedirs(wpr_dir, exist_ok=True)
 
-                if args.agm:
-                    agm_start(os.path.join(agm_dir, agm_outfile))
+                wpr_outfile = "{}_{}_onnx_{}_{}n_{}t_{}i_{}nt_{}it_{}dts_run1.etl".format(kwargs['model_name'],
+                                                                                          args.metadata,
+                                                                                          args.config_file,
+                                                                                          args.num_input,
+                                                                                          args.time_limit,
+                                                                                          kwargs['instance_count'],
+                                                                                          kwargs['num_threads'],
+                                                                                          args.intra_threads,
+                                                                                          str(int(
+                                                                                              not args.enable_thread_spinning)))
 
-                output = subprocess.run(command, shell=True, capture_output=True)
+            if args.etl:
+                pass  # wpr_start()
 
-                if args.agm:
-                    agm_stop()
+            if args.agm:
+                agm_start(os.path.join(agm_dir, agm_outfile))
 
-                if not output.returncode:
-                    latency_line = re.findall(r"total inference time : ?(?:\d*\.*\d+)", output.stderr.decode("utf-8"))
+            p = Process(target=ort_inf.start_inference, args=(kwargs['instance_count'],
+                                                              args.layout,
+                                                              args.config_file,
+                                                              args.compile_only,
+                                                              args.num_input,
+                                                              True,
+                                                              args.profiling,
+                                                              not args.enable_thread_spinning,
+                                                              args.time_limit,
+                                                              0,
+                                                              kwargs['num_threads'],
+                                                              'ryzen-ai',
+                                                              3,
+                                                              args.intra_threads))
 
-                    latency = latency_line[0].split(' ')[-1] + 'ms'
+            p.start()
 
-                else:
-                    latency = '0ms'
+            p.join()
 
-                old_name_list = agm_outfile.split('_')
-                old_name_list.insert(-1, latency)
-                new_name = '_'.join(old_name_list)
+            p.terminate()
 
-                if args.agm:
-                    shutil.move(os.path.join(agm_dir, agm_outfile), os.path.join(agm_dir, new_name),
-                                copy_function=shutil.copy2)
+            p.close()
 
-        else:
-            for i, model_name in enumerate(models):
-                logging.info("Setting system idle for 2 minutes...\n")
-                time.sleep(120)
+            if args.etl:
+                pass  # wpr_stop(os.path.join(wpr_dir, wpr_oufile))
 
-                # if args.agm:
-                agm_dir = os.path.join(kwargs['working_dir'], 'onnx', 'agm_logs', args.metadata)
-                os.makedirs(agm_dir, exist_ok=True)
-
-                agm_outfile = "{}_{}_vart_{}r_run1.csv".format(model_name, args.metadata, 3000)
-
-                # these path might change
-                bin_root = os.path.join(os.path.expanduser('~'), 'Desktop', 'win24_mep')
-                exe_path = os.path.join(bin_root, 'voe-win_amd64-with_xcompiler_on-latest_dev', 'bin', 'vart_perf.exe')
-                model_path = os.path.join(kwargs['working_dir'], 'cache_STRIX_ipu_benchmark_4x4_subgraph500_opt3',
-                                          'a1_iputest', 'vaip', '.cache', model_name,
-                                          'compiled.AMD_AIE2P_win24_4x4_Overlay_fat.xmodel')
-
-                assert os.environ['CONDA_DEFAULT_ENV'] == 'onnx_wm'
-
-                if os.environ['XLNX_VART_FIRMWARE'] != os.path.join(bin_root, '4x4.xclbin'):
-                    os.environ['XLNX_VART_FIRMWARE'] = os.path.join(bin_root, '4x4.xclbin')
-                    time.sleep(5)
-
-                logging.info('using xclbin: {}\n'.format(os.environ['XLNX_VART_FIRMWARE']))
-
-                command = exe_path + ' -r 3000 --xmodel ' + model_path
-
-                if args.agm:
-                    agm_start(os.path.join(agm_dir, agm_outfile))
-
-                output = subprocess.run(command, shell=True, capture_output=True)
-
-                if args.agm:
-                    agm_stop()
-
-                if not output.returncode:
-                    fps_line = re.findall(r"Inference per second: ?(?:\d*\.*\d+)", output.stdout.decode("utf-8"))
-                    latency_line = re.findall(r"latency : ?(?:\d*\.*\d+) us", output.stdout.decode("utf-8"))
-
-                    fps = fps_line[0].split(' ')[-1] + 'fps'
-                    latency = str(float(latency_line[0].split(' ')[-2]) / 1000.0) + 'ms'
-
-                else:
-                    fps = '0fps'
-                    latency = '0ms'
-
-                old_name_list = agm_outfile.split('_')
-                old_name_list.insert(-1, latency)
-                new_name = '_'.join(old_name_list)
-
-                if args.agm:
-                    shutil.move(os.path.join(agm_dir, agm_outfile), os.path.join(agm_dir, new_name),
-                                copy_function=shutil.copy2)
-
-    # procyon and shell standalone models
-    else:
-        for (isc, nt) in list(itertools.product(args.instance_count, args.num_threads)):
-            kwargs['instance_count'] = isc
-            kwargs['num_threads'] = nt
-
-            for i, model_name in enumerate(models):
-                logging.info("Setting system idle for 2 minutes...\n")
-                time.sleep(120)
-
-                kwargs['model_name'] = model_name
-
-                ort_inf = ONNXInference(model_name=model_name, metadata=args.metadata)
-
-                if args.agm:
-                    agm_dir = os.path.join(kwargs['working_dir'], 'onnx', 'agm_logs', args.metadata)
-                    os.makedirs(agm_dir, exist_ok=True)
-
-                    agm_outfile = "{}_{}_onnx_{}_{}n_{}t_{}i_{}nt_{}it_{}dts_run1.csv".format(kwargs['model_name'],
-                                                                                              args.metadata,
-                                                                                              args.config_file,
-                                                                                              args.num_input,
-                                                                                              args.time_limit,
-                                                                                              kwargs['instance_count'],
-                                                                                              kwargs['num_threads'],
-                                                                                              args.intra_threads,
-                                                                                              str(int(
-                                                                                                  not args.enable_thread_spinning)))
-
-                if args.etl:
-                    wpr_dir = os.path.join(kwargs['working_dir'], 'onnx', 'etl_traces', args.metadata)
-                    os.makedirs(wpr_dir, exist_ok=True)
-
-                    wpr_outfile = "{}_{}_onnx_{}_{}n_{}t_{}i_{}nt_{}it_{}dts_run1.etl".format(kwargs['model_name'],
-                                                                                              args.metadata,
-                                                                                              args.config_file,
-                                                                                              args.num_input,
-                                                                                              args.time_limit,
-                                                                                              kwargs['instance_count'],
-                                                                                              kwargs['num_threads'],
-                                                                                              args.intra_threads,
-                                                                                              str(int(
-                                                                                                  not args.enable_thread_spinning)))
-
-                if args.etl:
-                    pass  # wpr_start()
-
-                if args.agm:
-                    agm_start(os.path.join(agm_dir, agm_outfile))
-
-                p = Process(target=ort_inf.start_inference, args=(kwargs['instance_count'],
-                                                                  args.layout,
-                                                                  args.config_file,
-                                                                  args.compile_only,
-                                                                  args.num_input,
-                                                                  True,
-                                                                  args.profiling,
-                                                                  not args.enable_thread_spinning,
-                                                                  args.time_limit,
-                                                                  0,
-                                                                  kwargs['num_threads'],
-                                                                  'ryzen-ai',
-                                                                  3,
-                                                                  args.intra_threads))
-
-                p.start()
-
-                p.join()
-
-                p.terminate()
-
-                p.close()
-
-                if args.etl:
-                    pass  # wpr_stop(os.path.join(wpr_dir, wpr_oufile))
-
-                if args.agm:
-                    agm_stop()
+            if args.agm:
+                agm_stop()
