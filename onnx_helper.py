@@ -24,7 +24,7 @@ from onnxruntime.quantization import QuantFormat, QuantType, CalibrationDataRead
 from onnxruntime.quantization.shape_inference import quant_pre_process
 
 import torch
-from typing import Optional, List
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ def get_correct_dtype(input_type: str):
 # generate random input images instead of real images; batch size = 1
 # input data size := (b, h, w, c)
 def get_random_input(
-        input_shape: List[int],
+        input_shape: list[int],
         input_type: str,
         batch_size: int = 1
 ):
@@ -64,6 +64,15 @@ def get_random_input(
         get_correct_dtype(re.search(r"\((.*)\)", input_type).group(0)))
 
     return input_data
+
+
+# check if tensor is nhcw
+def is_nchw(shape):
+    if shape[1] < shape[2] and shape[1] < shape[3]:
+        return True
+
+    else:
+        return False
 
 
 # CalibrationData for quantization
@@ -82,7 +91,7 @@ class ImageCalibrationData(CalibrationDataReader):
 
         self.input_dict = {}
         for _input in dummy_session.get_inputs():
-            if self.calib_dataset and not self.is_nhwc(_input.shape):
+            if self.calib_dataset and is_nchw(_input.shape):
                 self.input_dict[str(_input.name)] = (self.convert_nchw_to_nhwc_shape(_input.shape), _input.type)
             else:
                 self.input_dict[str(_input.name)] = (_input.shape, _input.type)
@@ -103,13 +112,6 @@ class ImageCalibrationData(CalibrationDataReader):
         shape[1], shape[3] = shape[3], shape[1]
 
         return shape
-
-    def is_nhwc(self, shape):
-        if shape[1] > shape[3] and shape[2] > shape[3]:
-            return True
-
-        else:
-            return False
 
     def data_init(self):
         # input data size := (b, h, w, c)
@@ -264,16 +266,16 @@ class ONNXInference:
                               model: torch.nn.Module,
                               pass_inputs: bool = False,
                               model_inputs: tuple[torch.Tensor] = None,
-                              input_shape: (tuple or list) = None,
+                              input_shape: tuple = None,
                               input_names: Optional[list] = None,
                               output_names: Optional[list] = None,
-                              input_dynamic_axes: Optional[List[dict]] = None,
-                              output_dynamic_axes: Optional[List[dict]] = None,
-                              opset_version: int = 15,
+                              input_dynamic_axes: Optional[list[dict]] = None,
+                              output_dynamic_axes: Optional[list[dict]] = None,
+                              opset_version: int = 17,
                               use_dynamo: bool = False,
                               use_external_data: bool = False,
                               exist_ok: bool = True,
-                              ) -> int:
+    ) -> int:
         if not use_dynamo:
             self.opset_version = opset_version
             self.use_external_data = use_external_data
@@ -425,6 +427,17 @@ class ONNXInference:
                 external_data_location=external_data_location,
                 external_data_size_threshold=1024,
             )
+        
+        dummy_session = ort.InferenceSession(infer_model_path, providers=['CPUExecutionProvider'])
+
+        is_model_nchw = False
+        
+        for _input in dummy_session.get_inputs():
+            if is_nchw(_input.shape):
+                is_model_nchw = True
+            
+            else:
+                is_model_nchw = False
 
         logger.info("Quantizing onnx model ...\n")
 
@@ -436,9 +449,9 @@ class ONNXInference:
             calibrate_method=vai_q_onnx.PowerOfTwoMethod.MinMSE,
             activation_type=QuantType.QInt8,
             weight_type=QuantType.QInt8,
-            enable_dpu=True,  # option for model running on ipu
+            enable_ipu_cnn=True,  # option for model running on ipu
             extra_options={'ActivationSymmetric': True},
-            convert_nchw_to_nhwc=True,
+            convert_nchw_to_nhwc=is_model_nchw,
         )
 
         try:
@@ -543,16 +556,17 @@ class ONNXInference:
             if layout == '1x4':
                 os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_Nx4_Overlay"
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, '1x4.xclbin')
+                os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 8))
 
             elif layout == '4x4':
                 os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_4x4_Overlay"
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, '4x4.xclbin')
+                os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 2))
 
             else:
                 raise Exception("Invalid Layout parameter: should be 1x4 or 4x4")
 
-            os.environ['XLNX_ENABLE_CACHE'] = '1'
-            os.environ['NUM_OF_DPU_RUNNERS'] = str(self.instance_count)
+            os.environ['XLNX_ENABLE_CACHE'] = '1'            
             os.environ['XLNX_ONNX_EP_VERBOSE'] = '1' if compile_only else '0'
             os.environ['XLNX_ENABLE_STAT_LOG'] = '0'
 
@@ -584,6 +598,7 @@ class ONNXInference:
                     "ONNXRuntime does not support VitisAIExecutionProvider. Build ONNXRuntime appropriately")
 
             # IPU compilation takes place when the session is created
+            logger.info("Model compiled successfully!!\n")
 
         else:
             config_file_path = None
