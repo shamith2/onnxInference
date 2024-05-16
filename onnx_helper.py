@@ -34,6 +34,12 @@ __version__ = "1.0.0"
 
 
 # global functions
+def check_install_dir(voe_dir: str):
+    if not os.path.exists(os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)):
+        raise Exception("Invalid VOE installation: voe-4.0-win_amd64 or voe-win_amd64-latest missing")
+        sys.exit(9)
+    
+    return True
 
 # infer the correct dtype for inputs and outputs
 def get_correct_dtype(input_type: str):
@@ -197,6 +203,7 @@ class ONNXInference:
     ):
         if model_name is None:
             raise Exception("model_name cannot be None")
+            sys.exit(1)
 
         self.model_name = str(model_name)
 
@@ -236,6 +243,7 @@ class ONNXInference:
 
             if mode not in ['fp32', 'int8', 'ryzen-ai', 'cache']:
                 raise Exception("mode has to be either fp32 or int8 or ryzen-ai or cache")
+                sys.exit(2)
 
             if mode == 'fp32':
                 to_path = os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
@@ -261,6 +269,7 @@ class ONNXInference:
                 
                 else:
                     raise Exception("If mode is cache, then model_path has to be a directory")
+                    sys.exit(3)
 
     def convert_torch_to_onnx(self,
                               model: torch.nn.Module,
@@ -292,6 +301,7 @@ class ONNXInference:
 
         if not isinstance(model, torch.nn.Module):
             raise Exception("[ERROR] Model has to be of type torch.nn.Module")
+            sys.exit(4)
 
         if os.path.exists(self.fp32_onnx_dir):
             if not exist_ok:
@@ -310,10 +320,12 @@ class ONNXInference:
 
         if pass_inputs and model_inputs is None:
             raise Exception("Input cannot be None")
+            sys.exit(5)
 
         if not pass_inputs:
             if input_shape is None:
                 raise Exception("Input shape cannot be None")
+                sys.exit(6)
 
             else:
                 model_inputs = tuple(torch.randn(*input_shape, requires_grad=False))
@@ -385,6 +397,7 @@ class ONNXInference:
 
         except onnx.checker.ValidationError as e:
             raise Exception(e)
+            sys.exit(7)
 
         logger.info("Successfully converted PyTorch model to ONNX!!\n")
 
@@ -459,6 +472,7 @@ class ONNXInference:
 
         except onnx.checker.ValidationError as e:
             raise Exception(e)
+            sys.exit(8)
 
         logger.info("Successfully quantized onnx model!!\n")
 
@@ -550,35 +564,40 @@ class ONNXInference:
 
         # ryzen-ai := int8 on ryzen ai processor
         if inf_mode == 'ryzen-ai':
-            self.config_file_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], 'voe-4.0-win_amd64')
-            self.xclbin_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], 'voe-4.0-win_amd64')
+            voe_dir = 'voe-win_amd64-latest'
+            check_install_dir(voe_dir)
+
+            self.config_file_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)
+            self.xclbin_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)
 
             if layout == '1x4':
                 os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_Nx4_Overlay"
-                os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, '1x4.xclbin')
+                os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_Nx4_Overlay.xclbin')
                 os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 8))
 
             elif layout == '4x4':
                 os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_4x4_Overlay"
-                os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, '4x4.xclbin')
+                os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_4x4_Overlay.xclbin')
                 os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 2))
 
             else:
                 raise Exception("Invalid Layout parameter: should be 1x4 or 4x4")
+                sys.exit(10)
 
             os.environ['XLNX_ENABLE_CACHE'] = '1'            
             os.environ['XLNX_ONNX_EP_VERBOSE'] = '1' if compile_only else '0'
             os.environ['XLNX_ENABLE_STAT_LOG'] = '0'
 
             if config_file_name is None:
-                config_file_name = 'vaip_config.json'
+                config_file_name = 'vaip_config_1x4.json'
             else:
-                config_file_name = config_file_name + '.json'
+                config_file_name = config_file_name + '_' + layout + '.json'
 
             config_file_path = os.path.join(self.config_file_dir, str(config_file_name))
 
             if not os.path.exists(config_file_path):
                 raise Exception("Cannot find {} in {}".format(config_file_name, config_file_path))
+                sys.exit(11)
 
             ort_session = ort.InferenceSession(
                 onnx_model_path,
@@ -588,7 +607,7 @@ class ONNXInference:
                     {
                         "config_file": config_file_path,
                         "cacheDir": self.cache_dir,
-                        "cacheKey": self.model_name + '_ryzen_ai_' + str(config_file_name)[:-5] + '_' + str(layout),
+                        "cacheKey": self.model_name + '_ryzen_ai_' + str(config_file_name)[:-5],
                     },
                 ],
             )
@@ -596,6 +615,7 @@ class ONNXInference:
             if "VitisAIExecutionProvider" not in ort_session.get_providers():
                 raise EnvironmentError(
                     "ONNXRuntime does not support VitisAIExecutionProvider. Build ONNXRuntime appropriately")
+                sys.exit(12)
 
             # IPU compilation takes place when the session is created
             logger.info("Model compiled successfully!!\n")
@@ -629,13 +649,15 @@ class ONNXInference:
         logger.info("Creating task queue...\n")
 
         # create a task_queue
-        with ThreadPoolExecutor(max_workers=num_threads) as threads:
+        with ThreadPoolExecutor(max_workers=max(num_threads, 8)) as threads:
             tasks = [threads.submit(task_fn, task_queue, generate_random_data, 1, 1, 1) for _ in range(num_input_data)]
             # wait(tasks)
 
         task = functools.partial(self.start_processing_iter, ort_session, output_feed)
 
         logger.info("Starting ONNXRuntime Benchmark...\n")
+        logger.info("Minimize Terminal for Power Measurement: 15 seconds\n")
+        time.sleep(15)
 
         # run benchmark inference
         with ThreadPoolExecutor(max_workers=num_threads) as threads:
