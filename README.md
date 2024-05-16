@@ -1,4 +1,4 @@
-# ryzen_ai
+# ryzenAI
 Running ONNX Models on AMD APU with Ryzen AI processor
 
 onnx_helper.py = script to convert pytorch model to onnx, quantize fp32 onnx models to int8, and run benchmark inference on Ryzen AI processors
