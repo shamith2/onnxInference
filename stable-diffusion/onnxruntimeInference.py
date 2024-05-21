@@ -13,10 +13,11 @@ import onnxruntime
 from sdHelper import getDtype
 
 import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-__producer__ = "inference_onnxruntime"
+__producer__ = "onnxruntimeInference"
 __version__ = "0.1.0"
 
 
