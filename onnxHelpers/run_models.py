@@ -1,6 +1,6 @@
 # Sample script to demonstrate on using onnx_benchmark.py to benchmark onnx models using onnxruntime
 
-from onnx_helper import ONNXInference
+from onnxBenchmark import ONNXInference
 
 import gc
 import argparse
