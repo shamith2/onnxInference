@@ -10,7 +10,7 @@ from typing import Optional, Union
 import numpy
 import onnxruntime
 
-from helper import getDtype
+from sdHelper import getDtype
 
 import logging
 logging.basicConfig(level=logging.INFO)
