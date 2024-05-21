@@ -1,10 +1,10 @@
 # Insights into ONNX Models for AI Applications
 Getting to know more about onnx models, insights into their performance and bottlenecks for practical applications and pipelines
 
-onnxHelpers/onnxBenchmark.py = script to convert pytorch model to onnx, quantize fp32 onnx models to int8, and run benchmark inference on AMD Ryzen AI processor
-onnxHelpers/onnxTransformer.py = script to modify operators in onnx models
+- onnxHelpers/onnxBenchmark.py = script to convert pytorch model to onnx, quantize fp32 onnx models to int8, and run benchmark inference on AMD Ryzen AI processor
+- onnxHelpers/onnxTransformer.py = script to modify operators in onnx models
 
-stable-diffusion = scripts to run stable diffusion pipeline, currently on running on CPU + DirectML-supported devices
+- stable-diffusion = scripts to run stable diffusion pipeline, currently on running on CPU + DirectML-supported devices
 
 ![image](https://github.com/shamith2/ryzenAI/assets/43729418/086c4869-51d3-4b1e-8473-165cadf29647)
 
