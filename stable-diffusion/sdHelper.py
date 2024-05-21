@@ -1,4 +1,4 @@
-# Helper functions for Python ONNXRuntime Pipeline
+# Helper functions for Python Stable Diffusion ONNXRuntime Pipelines
 
 import os
 import numpy
@@ -11,6 +11,14 @@ import cv2
 import pyautogui
 
 from typing import Optional
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+__producer__ = "sdHelper"
+__version__ = "0.1.0"
 
 
 def changeDtype(
