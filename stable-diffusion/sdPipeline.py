@@ -17,7 +17,7 @@ import onnxruntime
 from transformers import CLIPTokenizerFast
 from diffusers import EulerAncestralDiscreteScheduler
 
-from inference_onnxruntime import ORTSessionOptions, init_Inference, Inference
+from onnxruntimeInference import ORTSessionOptions, init_Inference, Inference
 from sdHelper import changeDtype, dumpMetadata, saveTensorasImage, getTensorfromImage, getFramesfromVideo, createVideofromFrames, siLU, visualizeLatents
 
 import logging
