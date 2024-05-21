@@ -1,8 +1,16 @@
 # This script contains functions for modifying ONNX graphs
+# TODO: include ONNX graph optimizations
 
 import copy
 import os
 import onnx
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+__producer__ = "onnxTransformer"
+__version__ = "0.1.0"
 
 class ONNXTransformer:
     def __init__(self, onnx_model_path: str):
