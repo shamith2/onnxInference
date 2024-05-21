@@ -1,4 +1,4 @@
-# This script contains functions for converting PyTorch model to ONNX, running ONNX models using ONNXRuntime, Quantizing and Performance Analysis of ONNX nodels
+# This script contains functions for converting PyTorch model to ONNX, benchmarking ONNX models using ONNXRuntime, Quantizing and Performance Analysis of ONNX nodels
 # Version: v1.0.0
 
 from collections import deque
@@ -29,7 +29,7 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-__producer__ = "onnx_helper"
+__producer__ = "onnxBenchmark"
 __version__ = "1.0.0"
 
 
