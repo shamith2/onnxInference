@@ -1,0 +1,6 @@
+WARNING:root:Dynamic Axes might not work as intended
+
+INFO:root:Converting Sepformer from PyTorch to ONNX ...
+
+INFO:root:Successfully converted PyTorch model to ONNX!!
+
