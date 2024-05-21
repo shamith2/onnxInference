@@ -1,4 +1,4 @@
-# Implement Python Stable Diffusion pipelines with ONNXRuntime
+# Implement Python Stable Diffusion pipelines with ONNXRuntime and Python
 
 import copy
 import os
@@ -18,7 +18,15 @@ from transformers import CLIPTokenizerFast
 from diffusers import EulerAncestralDiscreteScheduler
 
 from inference_onnxruntime import ORTSessionOptions, init_Inference, Inference
-from helper import changeDtype, dumpMetadata, saveTensorasImage, getTensorfromImage, getFramesfromVideo, createVideofromFrames, siLU, visualizeLatents
+from sdHelper import changeDtype, dumpMetadata, saveTensorasImage, getTensorfromImage, getFramesfromVideo, createVideofromFrames, siLU, visualizeLatents
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+__producer__ = "sdPipeline"
+__version__ = "0.1.0"
 
 SDXL = False
 
