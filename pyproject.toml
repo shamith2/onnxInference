@@ -1,0 +1,49 @@
+# pyproject.toml
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "onnxInsights"
+dynamic = ["version"]
+authors = [
+    {name = "Shamith Achanta", email = "achantashamith007@gmail.com"},
+]
+description = "Getting to know more about onnx models: insights into their performance and bottlenecks for practical applications"
+keywords = ["onnxInsights", "onnx", "onnxruntime"]
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+]
+requires-python = ">= 3.9"
+dependencies = [
+    "pip",
+    "tzdata",
+    "wheel",
+    "pytest",
+    "cmake",
+    "onnx",
+    "numpy",
+    "onnxruntime-directml",
+    "torch",
+    "torch-directml",
+    "optimum",
+    "diffusers",
+    "scipy",
+    "accelerate",
+    "tqdm",
+    "matplotlib",
+    "pandas",
+    "psutil",
+    "opencv-python",
+    "pyautogui"
+]
+
+[tool.hatch.version]
+path = "src/onnxInsights/__init__.py"
+
+[project.urls]
+repository = "https://github.com/shamith2/onnxInsights"

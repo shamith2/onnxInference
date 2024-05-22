@@ -1,4 +1,4 @@
-stableDiffusion/.cache/
-stableDiffusion/__pycache__
-stableDiffusion/sdxl-turbo-fp16-onnx/
-stableDiffusion/sd-turbo-onnx/
+**/.pytest_cache/
+**/__pycache__/
+
+weights/
