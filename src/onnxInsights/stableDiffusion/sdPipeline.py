@@ -439,7 +439,8 @@ def SD_Turbo_pipeline(
         steps: int = 1,
         cache_directory: Optional[str] = CACHE_DIR,
         save_directory: Optional[str] = SD_T_RESULT_DIR,
-        output_filename: Optional[str] = 'sd_final_output'
+        output_filename: Optional[str] = 'sd_final_output',
+        display: bool = False
 ) -> int:
     """
     Stable Diffusion v2.1 Turbo onnxruntime pipeline
@@ -486,7 +487,7 @@ def SD_Turbo_pipeline(
         False
     )
 
-    if image is None:
+    if image is not None:
         latents, _ = runVAEEncoder(
             model_directory,
             image,
@@ -541,7 +542,7 @@ def SD_Turbo_pipeline(
 
     unet_inference_time = unet_inference_time / steps
 
-    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, False)
+    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, display)
 
     end = time.time() - start
 
@@ -560,7 +561,8 @@ def SDXL_Turbo_pipeline(
         steps: int = 1,
         cache_directory: Optional[str] = CACHE_DIR,
         save_directory: Optional[str] = SD_XL_RESULT_DIR,
-        output_filename: Optional[str] = 'sd_final_output'
+        output_filename: Optional[str] = 'sd_final_output',
+        display: bool = False
 ) -> int:
     """
     Stable Diffusion XL Turbo onnxruntime pipeline
@@ -659,7 +661,7 @@ def SDXL_Turbo_pipeline(
 
     unet_inference_time = unet_inference_time / steps
 
-    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, False)
+    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, display)
 
     end = time.time() - start
 

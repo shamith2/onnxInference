@@ -1,4 +1,6 @@
 **/.pytest_cache/
 **/__pycache__/
+**/*.onnx
+**/*.onnx_data
 
 weights/
