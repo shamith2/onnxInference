@@ -12,6 +12,8 @@ from typing import Any
 
 from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
 
+import pandas
+
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -22,13 +24,15 @@ __version__ = "0.1.0"
 
 
 DTYPES = {
-    'TensorProto.FLOAT': 4,
+    'TensorProto.BOOL': 1,
+    'TensorProto.UINT8': 1,
+    'TensorProto.INT8': 1,
     'TensorProto.UINT16': 2,
     'TensorProto.INT16': 2,
     'TensorProto.FLOAT16': 2,
+    'TensorProto.FLOAT': 4,
+    'TensorProto.INT64': 8,
     'TensorProto.DOUBLE': 8,
-    'TensorProto.UINT8': 1,
-    'TensorProto.INT8': 1,
 }
 
 
@@ -73,6 +77,20 @@ def checkandSaveModel(
     return 0
 
 
+def _convert_shape_tuple_to_string(
+        tuple_of_tuple: tuple[tuple[Any]]
+) -> str:
+    output = ''
+
+    for i, shape_tuple in enumerate(tuple_of_tuple):
+        output += 'x'.join(str(dim) for dim in shape_tuple)
+
+        if i < len(tuple_of_tuple) - 1:
+            output += ', '
+    
+    return output
+
+
 class ONNXTransformer:
     def __init__(
             self,
@@ -101,6 +119,9 @@ class ONNXTransformer:
             onnx.checker.check_model(onnx_model_path)
 
         self.onnx_graph = copy.deepcopy(self.onnx_model.graph)
+
+        self.node_input_dict = {}
+        self.node_output_dict = {}
 
 
     # adapted from https://github.com/onnx/onnx/blob/main/onnx/tools/update_model_dims.py
@@ -186,6 +207,14 @@ class ONNXTransformer:
         return save_path
 
 
+    def render(
+        self,
+        file_directory: str,
+        filename: str
+    ) -> str:
+        return "Import-Csv " + os.path.join(file_directory, filename) + " | Out-GridView"
+
+
     def shapeInfer(
             self,
             static_input_dims: list,
@@ -214,6 +243,31 @@ class ONNXTransformer:
         return 0
 
 
+    def updateTensorDict(
+            self,
+            model_input_list: list,
+            model_output_list: list,
+            model_value_info_list: list[onnx.ValueInfoProto],
+            model_initalizer_list: list
+    ) -> dict:
+        tensor_dict = {}
+
+        for tensor_list in [model_input_list, model_output_list, model_value_info_list]:
+            for tensor in tensor_list:    
+                shape = ()
+
+                for dim in tensor.type.tensor_type.shape.dim:
+                    shape += (dim.dim_value,)
+                
+                tensor_dict[tensor.name] = {'shape': shape, 'size': DTYPES[tensor_dtype_to_string(tensor.type.tensor_type.elem_type)]}
+
+        for initializer in model_initalizer_list:
+            tensor_dict[initializer.name] = {'shape': tuple(initializer.dims), 'size': DTYPES[tensor_dtype_to_string(initializer.data_type)]}
+
+        
+        return tensor_dict
+
+
     def countOperators(
             self,
             graph: onnx.GraphProto
@@ -221,42 +275,129 @@ class ONNXTransformer:
         # list of onnx.NodeProto
         self.nodes = graph.node
 
-        # model inputs
+        # list of valid onnx.NodeProto for analysis
+        self.valid_nodes_list = [node.name for node in self.nodes]
+
+        # model inputs and outputs
         self.inputs = graph.input
+        self.outputs = graph.output
 
         # list of onnx.TensorProto
         self.model_weights = graph.initializer
 
         # operator and tensor dicts
         self.count_operators = {}
-        self.weights_memory = {}
-        self.tensor_dict = {}
-        
-        for initializer in self.model_weights:
-            self.weights_memory[initializer.name] = numpy.prod(initializer.dims) * DTYPES[tensor_dtype_to_string(initializer.data_type)]
 
-        for tensor in graph.value_info:
-            shape = ()
 
-            for dim in tensor.type.tensor_type.shape.dim:    
-                shape += (dim.dim_value,)
-            
-                self.tensor_dict[tensor.name] = shape
+        self.tensor_dict = self.updateTensorDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
+
 
         for i, node in enumerate(self.nodes):
-            if '/time_proj/Constant_1_output_0' in node.input:
-                print(node.input)
-                print(self.tensor_dict['/time_proj/Constant_1_output_0'])
+            shapes = ()
+            size = ()
+            _exclude_nodes = []
+            
+            for i, node_input in enumerate(node.input):
+                if node_input:
+                    input_shape = self.tensor_dict[node_input]['shape']
+
+                    if input_shape:
+                        shapes += (input_shape,)
+                        size += (self.tensor_dict[node_input]['size'],)
+                
+                    else:
+                        _exclude_nodes.append(node_input)
+                
+                else:
+                    _exclude_nodes.append(node_input)
+            
+            node_input_list = node.input
+
+            for in_node in _exclude_nodes:
+                node_input_list.remove(in_node)
+
+            self.node_input_dict[node.name] = (tuple(node_input_list), shapes, size)
+            
+            shapes = ()
+            size = ()
+            _exclude_nodes = []
+            
+            for i, node_output in enumerate(node.output):
+                output_shape = self.tensor_dict[node_output]['shape']
+
+                if output_shape:
+                    shapes += (output_shape,)
+                    size += (self.tensor_dict[node_output]['size'],)
+                
+                else:
+                    _exclude_nodes.append(node_output)
+            
+            node_output_list = node.output
+
+            for out_node in _exclude_nodes:
+                node_output_list.remove(out_node)
+
+            if not node_output_list:
+                self.valid_nodes_list.remove(node.name)
+            
+            self.node_output_dict[node.name] = (tuple(node_output_list), shapes, size)
 
             if self.count_operators.get(node.op_type, None) is None:
                 self.count_operators[node.op_type] = 1
             
             else:
                 self.count_operators[node.op_type] += 1
+
+
+        self.input_memory_dict = {}
+        self.output_memory_dict = {}
+
+        for node in self.node_input_dict:
+            name, shape, size = self.node_input_dict[node]
+            count = len(name)
+
+            memory_size = ()
+
+            for i in range(count):
+                memory_size += (numpy.prod(shape[i], dtype=numpy.int64) * size[i],)
+
+            self.input_memory_dict[node] = memory_size
         
-        from matplotlib import pyplot as plt
-        plt.barh(self.count_operators.keys(), self.count_operators.values(), 1, color='g')
-        plt.show()
+        for node in self.node_output_dict:
+            name, shape, size = self.node_output_dict[node]
+            count = len(name)
+
+            memory_size = ()
+
+            for i in range(count):
+                memory_size += (numpy.prod(shape[i], dtype=numpy.int64) * size[i],)
+
+            self.output_memory_dict[node] = memory_size
+
+
+        print(len(self.node_input_dict.keys()))
+
+        print(len(self.node_output_dict.keys()))
+
+        print(len(graph.node))
+
+        dataframe = pandas.DataFrame(columns=['Node', 'Input Shape', 'Output Shape'])
+
+        for i, node in enumerate(self.valid_nodes_list):
+            row = pandas.DataFrame([[node, _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1])]],
+                                     columns=dataframe.columns)
+            
+            dataframe = pandas.concat([dataframe, row], ignore_index=True)
+        
+        dataframe.to_csv(os.path.join(self.debug_directory, 'summary.csv'), index=False)
+
+        print(self.render(self.debug_directory, 'summary.csv'))
+        
+        
+        # from matplotlib import pyplot as plt
+        # plt.barh(self.count_operators.keys(), self.count_operators.values(), 1, color='g')
+        # plt.show()
         
         raise NotImplementedError
 
