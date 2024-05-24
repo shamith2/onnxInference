@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 __producer__ = "onnxTransformer"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 DTYPES = {
@@ -397,18 +397,32 @@ class ONNXTransformer:
 
         self.output_params_dict, self.output_memory_dict = self.getMemoryInfo(self.node_output_dict)
 
-        dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Inputs Shape', 'Weights and Bias Shape', 'Output Shape',
-                                              'Input Params Size', 'Weights and Bias Params Size', 'Output Params Size',
-                                              'Input Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
+        # summarize
+        self.summarize()
+        
+        
+        # from matplotlib import pyplot as plt
+        # plt.barh(self.count_operators.keys(), self.count_operators.values(), 1, color='g')
+        # plt.show()
+        
+        raise NotImplementedError
+    
+
+    def summarize(
+            self
+    ) -> None:
+        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'Inputs Shape', 'Output Shape',
+                                              'Weights and Bias Shape', 'Inputs Size', 'Output Size',
+                                              'Inputs Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
                                               'Output Memory (in Bytes)'])
 
-        for i, (node, op_type) in enumerate(self.valid_nodes_list):
+        for node, op_type in self.valid_nodes_list:
             row = pandas.DataFrame([[node, op_type,
-                                     _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.input_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.input_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.input_memory_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_memory_dict[node], add=True),
@@ -417,16 +431,51 @@ class ONNXTransformer:
             
             dataframe = pandas.concat([dataframe, row], ignore_index=True)
         
+        # type-cast
+        dataframe['Number of Params'] = dataframe['Number of Params'].astype(numpy.int64)
+        dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype(numpy.int64)
+        dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype(numpy.int64)
+        dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype(numpy.int64)
+        
+        # params percent
+        dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100) / dataframe['Number of Params'].sum()).round(2))
+
+        # memory
+        dataframe.insert(4, 'Memory (in Bytes)', dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)'])
+
+        # type-cast
+        dataframe['Memory (in Bytes)'] = dataframe['Memory (in Bytes)'].astype(numpy.int64)
+
+        # memory percent
+        dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100) / dataframe['Memory (in Bytes)'].sum()).round(2))
+
+        dataframe.insert(6, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100) / 
+                                                   (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
+                                                   dataframe['Output Memory (in Bytes)'].sum())).round(2))
+        
+        dataframe.insert(7, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100) / 
+                                                   (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
+                                                   dataframe['Output Memory (in Bytes)'].sum())).round(2))
+
+        # total
+        dataframe.loc['Total'] = dataframe.sum(numeric_only=True).round(2)
+
+        # grouping by operator
+        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)',
+                                       'Weights and Bias Memory (in Bytes)', 'Weights and Bias Memory (%)',
+                                       'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(
+                                    ['Operator']).sum().reset_index()
+
+        # total
+        grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True)
+
+        grouped_dataframe = grouped_dataframe.round(2)
+       
         dataframe.to_csv(os.path.join(self.debug_directory, 'summary.csv'), index=False)
 
+        grouped_dataframe.to_csv(os.path.join(self.debug_directory, 'grouped_summary.csv'), index=False)
+
         print(self.render(self.debug_directory, 'summary.csv'))
-        
-        
-        # from matplotlib import pyplot as plt
-        # plt.barh(self.count_operators.keys(), self.count_operators.values(), 1, color='g')
-        # plt.show()
-        
-        raise NotImplementedError
 
 
     def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):
