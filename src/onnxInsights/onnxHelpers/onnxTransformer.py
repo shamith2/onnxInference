@@ -266,9 +266,35 @@ class ONNXTransformer:
 
         
         return tensor_dict
+    
+
+    def getMemoryInfo(
+            self,
+            node_param_dict: dict
+    ) -> tuple[dict, dict]:
+        input_params_dict = {}
+        input_memory_dict = {}
+
+        for node in node_param_dict:
+            name, shape, size = node_param_dict[node]
+            count = len(name)
+
+            params_size = ()
+            memory_size = ()
+
+            for i in range(count):
+                param_size = numpy.prod(shape[i], dtype=numpy.int64)
+
+                params_size += ((param_size.item(),),)
+                memory_size += (((param_size * size[i]).item(),),)
+
+            input_params_dict[node] = params_size
+            input_memory_dict[node] = memory_size
+        
+        return input_params_dict, input_memory_dict
 
 
-    def countOperators(
+    def profileGraph(
             self,
             graph: onnx.GraphProto
     ):
@@ -276,7 +302,7 @@ class ONNXTransformer:
         self.nodes = graph.node
 
         # list of valid onnx.NodeProto for analysis
-        self.valid_nodes_list = [node.name for node in self.nodes]
+        self.valid_nodes_list = [(node.name, node.op_type) for node in self.nodes]
 
         # model inputs and outputs
         self.inputs = graph.input
@@ -288,10 +314,10 @@ class ONNXTransformer:
         # operator and tensor dicts
         self.count_operators = {}
 
-
+        # tensor dict
         self.tensor_dict = self.updateTensorDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
 
-
+        # parse onnx gragh for inputs, outputs and weight data
         for i, node in enumerate(self.nodes):
             shapes = ()
             size = ()
@@ -338,7 +364,7 @@ class ONNXTransformer:
                 node_output_list.remove(out_node)
 
             if not node_output_list:
-                self.valid_nodes_list.remove(node.name)
+                self.valid_nodes_list.remove((node.name, node.op_type))
             
             self.node_output_dict[node.name] = (tuple(node_output_list), shapes, size)
 
@@ -349,43 +375,18 @@ class ONNXTransformer:
                 self.count_operators[node.op_type] += 1
 
 
-        self.input_memory_dict = {}
-        self.output_memory_dict = {}
+        # params size and memory size for inputs and outputs
+        self.input_params_dict, self.input_memory_dict = self.getMemoryInfo(self.node_input_dict)
 
-        for node in self.node_input_dict:
-            name, shape, size = self.node_input_dict[node]
-            count = len(name)
+        self.output_params_dict, self.output_memory_dict = self.getMemoryInfo(self.node_output_dict)
 
-            memory_size = ()
+        dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Input Shape', 'Output Shape', 'Output Params Size', 'Output Memory (in Bytes)'])
 
-            for i in range(count):
-                memory_size += (numpy.prod(shape[i], dtype=numpy.int64) * size[i],)
-
-            self.input_memory_dict[node] = memory_size
-        
-        for node in self.node_output_dict:
-            name, shape, size = self.node_output_dict[node]
-            count = len(name)
-
-            memory_size = ()
-
-            for i in range(count):
-                memory_size += (numpy.prod(shape[i], dtype=numpy.int64) * size[i],)
-
-            self.output_memory_dict[node] = memory_size
-
-
-        print(len(self.node_input_dict.keys()))
-
-        print(len(self.node_output_dict.keys()))
-
-        print(len(graph.node))
-
-        dataframe = pandas.DataFrame(columns=['Node', 'Input Shape', 'Output Shape'])
-
-        for i, node in enumerate(self.valid_nodes_list):
-            row = pandas.DataFrame([[node, _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1])]],
+        for i, (node, op_type) in enumerate(self.valid_nodes_list):
+            row = pandas.DataFrame([[node, op_type, _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.output_params_dict[node]),
+                                     _convert_shape_tuple_to_string(self.output_memory_dict[node])]],
                                      columns=dataframe.columns)
             
             dataframe = pandas.concat([dataframe, row], ignore_index=True)
@@ -498,6 +499,6 @@ if __name__ == '__main__':
 
     # onnx_t.shapeInfer([(1, 4, 64, 64), (1,), (1, 77, 1024)], [(1, 4, 64, 64)])
 
-    onnx_t.countOperators(onnx.load(os.path.join('.', 'inferred.onnx')).graph)
+    onnx_t.profileGraph(onnx.load(os.path.join('.', 'inferred.onnx')).graph)
     
     # onnx_t.modifyGraph(delete_block=['DequantizeLinear', 'Clip', 'QuantizeLinear'], upper_2_ok=False, only_middle=True)
