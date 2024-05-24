@@ -566,6 +566,7 @@ class ONNXTransformer:
         onnx.save_model(self.onnx_model, self.model_name + '_modified.onnx')
 
 
+# for testing
 if __name__ == '__main__':
     from pathlib import Path
 
