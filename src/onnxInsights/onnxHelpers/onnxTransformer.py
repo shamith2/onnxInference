@@ -122,6 +122,7 @@ class ONNXTransformer:
 
         self.node_input_dict = {}
         self.node_output_dict = {}
+        self.node_weight_dict = {}
 
 
     # adapted from https://github.com/onnx/onnx/blob/main/onnx/tools/update_model_dims.py
@@ -243,7 +244,7 @@ class ONNXTransformer:
         return 0
 
 
-    def updateTensorDict(
+    def updateTensorandWeightDict(
             self,
             model_input_list: list,
             model_output_list: list,
@@ -251,6 +252,7 @@ class ONNXTransformer:
             model_initalizer_list: list
     ) -> dict:
         tensor_dict = {}
+        weight_dict = {}
 
         for tensor_list in [model_input_list, model_output_list, model_value_info_list]:
             for tensor in tensor_list:    
@@ -262,10 +264,10 @@ class ONNXTransformer:
                 tensor_dict[tensor.name] = {'shape': shape, 'size': DTYPES[tensor_dtype_to_string(tensor.type.tensor_type.elem_type)]}
 
         for initializer in model_initalizer_list:
-            tensor_dict[initializer.name] = {'shape': tuple(initializer.dims), 'size': DTYPES[tensor_dtype_to_string(initializer.data_type)]}
+            weight_dict[initializer.name] = {'shape': tuple(initializer.dims), 'size': DTYPES[tensor_dtype_to_string(initializer.data_type)]}
 
         
-        return tensor_dict
+        return tensor_dict, weight_dict
     
 
     def getMemoryInfo(
@@ -314,60 +316,67 @@ class ONNXTransformer:
         # operator and tensor dicts
         self.count_operators = {}
 
-        # tensor dict
-        self.tensor_dict = self.updateTensorDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
+        # tensor dict and weights-bias dict
+        self.tensor_dict, self.wb_dict = self.updateTensorandWeightDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
 
-        # parse onnx gragh for inputs, outputs and weight data
+
         for i, node in enumerate(self.nodes):
-            shapes = ()
-            size = ()
-            _exclude_nodes = []
-            
+            node_input_list = []
+            node_wb_list = []
+            node_output_list = []
+
+            input_shapes = ()
+            input_size = ()
+
+            wb_shapes = ()
+            wb_size = ()
+
+            output_shapes = ()
+            output_size = ()
+
+            # parse onnx gragh for inputs and weight data
             for i, node_input in enumerate(node.input):
                 if node_input:
-                    input_shape = self.tensor_dict[node_input]['shape']
+                    if node_input in self.wb_dict.keys():
+                        wb_shape = self.wb_dict[node_input]['shape']
 
-                    if input_shape:
-                        shapes += (input_shape,)
-                        size += (self.tensor_dict[node_input]['size'],)
-                
+                        if wb_shape:
+                            wb_shapes += (wb_shape,)
+                            wb_size += (self.wb_dict[node_input]['size'],)
+
+                            node_wb_list.append(node_input)
+                    
                     else:
-                        _exclude_nodes.append(node_input)
-                
-                else:
-                    _exclude_nodes.append(node_input)
-            
-            node_input_list = node.input
+                        input_shape = self.tensor_dict[node_input]['shape']
 
-            for in_node in _exclude_nodes:
-                node_input_list.remove(in_node)
+                        if input_shape:
+                            input_shapes += (input_shape,)
+                            input_size += (self.tensor_dict[node_input]['size'],)
 
-            self.node_input_dict[node.name] = (tuple(node_input_list), shapes, size)
+                            node_input_list.append(node_input)
+
+            self.node_input_dict[node.name] = (tuple(node_input_list), input_shapes, input_size)
             
-            shapes = ()
-            size = ()
-            _exclude_nodes = []
+            self.node_weight_dict[node.name] = (tuple(node_wb_list), wb_shapes, wb_size)
             
+            # parse onnx gragh for outputs data
             for i, node_output in enumerate(node.output):
                 output_shape = self.tensor_dict[node_output]['shape']
 
                 if output_shape:
-                    shapes += (output_shape,)
-                    size += (self.tensor_dict[node_output]['size'],)
-                
-                else:
-                    _exclude_nodes.append(node_output)
+                    output_shapes += (output_shape,)
+                    output_size += (self.tensor_dict[node_output]['size'],)
+
+                    node_output_list.append(node_output)
             
-            node_output_list = node.output
+            if node_output_list:
+                self.node_output_dict[node.name] = (tuple(node_output_list), output_shapes, output_size)
 
-            for out_node in _exclude_nodes:
-                node_output_list.remove(out_node)
-
-            if not node_output_list:
+            # is node does not have a valid output shape, node can be ignored
+            else:
                 self.valid_nodes_list.remove((node.name, node.op_type))
-            
-            self.node_output_dict[node.name] = (tuple(node_output_list), shapes, size)
 
+            
             if self.count_operators.get(node.op_type, None) is None:
                 self.count_operators[node.op_type] = 1
             
@@ -380,10 +389,11 @@ class ONNXTransformer:
 
         self.output_params_dict, self.output_memory_dict = self.getMemoryInfo(self.node_output_dict)
 
-        dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Input Shape', 'Output Shape', 'Output Params Size', 'Output Memory (in Bytes)'])
+        dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Input Shape', 'Weight Shape', 'Output Shape', 'Output Params Size', 'Output Memory (in Bytes)'])
 
         for i, (node, op_type) in enumerate(self.valid_nodes_list):
             row = pandas.DataFrame([[node, op_type, _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_weight_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.output_params_dict[node]),
                                      _convert_shape_tuple_to_string(self.output_memory_dict[node])]],
@@ -489,6 +499,7 @@ class ONNXTransformer:
             raise Exception(e)
         
         onnx.save_model(self.onnx_model, self.model_name + '_modified.onnx')
+
 
 if __name__ == '__main__':
     from pathlib import Path
