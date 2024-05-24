@@ -9,6 +9,9 @@ import onnx
 from onnx.helper import tensor_dtype_to_string
 
 from typing import Any
+from pathlib import Path
+
+import subprocess
 
 from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
 
@@ -100,11 +103,8 @@ def _convert_shape_tuple_to_string(
 
 class ONNXTransformer:
     def __init__(
-            self,
-            onnx_model_path: str
+            self
     ):
-        self.onnx_model_path = onnx_model_path
-
         self.extension = '.onnx'
 
         self.workspace = Path(__file__).parent.resolve()
@@ -113,19 +113,6 @@ class ONNXTransformer:
 
         if not os.path.exists(self.debug_directory):
             os.makedirs(self.debug_directory)
-        
-        self.model_name = os.path.split(onnx_model_path)[-1].removesuffix(self.extension)
-        
-        # load onnx model from ssd
-        # self.onnx_model = onnx.load(onnx_model_path)
-        
-        # try:
-        #     onnx.checker.check_model(self.onnx_model)
-        
-        # except Exception as ValueError:
-        #     onnx.checker.check_model(onnx_model_path)
-
-        # self.onnx_graph = copy.deepcopy(self.onnx_model.graph)
 
         self.node_input_dict = {}
         self.node_output_dict = {}
@@ -219,7 +206,7 @@ class ONNXTransformer:
         self,
         file_directory: str,
         filename: str
-    ) -> str:
+    ) -> None:
         return "Import-Csv " + os.path.join(file_directory, filename) + " | Out-GridView"
 
 
@@ -475,7 +462,7 @@ class ONNXTransformer:
 
         grouped_dataframe.to_csv(os.path.join(self.debug_directory, 'grouped_summary.csv'), index=False)
 
-        print(self.render(self.debug_directory, 'summary.csv'))
+        print(self.render(self.debug_directory, 'grouped_summary.csv'))
 
 
     def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):
@@ -568,11 +555,7 @@ class ONNXTransformer:
 
 # for testing
 if __name__ == '__main__':
-    from pathlib import Path
-
-    model_path = os.path.join(Path(__file__).parent.resolve(), 'model.onnx')
-    
-    onnx_t = ONNXTransformer(model_path)
+    onnx_t = ONNXTransformer()
 
     # onnx_t.shapeInfer([(1, 4, 64, 64), (1,), (1, 77, 1024)], [(1, 4, 64, 64)])
 
