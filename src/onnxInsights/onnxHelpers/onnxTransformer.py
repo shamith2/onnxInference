@@ -398,16 +398,19 @@ class ONNXTransformer:
         self.output_params_dict, self.output_memory_dict = self.getMemoryInfo(self.node_output_dict)
 
         dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Inputs Shape', 'Weights and Bias Shape', 'Output Shape',
-                                              'Weights and Bias Params Size', 'Output Params Size',
-                                              'Weights and Bias Memory (in Bytes)', 'Output Memory (in Bytes)'])
+                                              'Input Params Size', 'Weights and Bias Params Size', 'Output Params Size',
+                                              'Input Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
+                                              'Output Memory (in Bytes)'])
 
         for i, (node, op_type) in enumerate(self.valid_nodes_list):
             row = pandas.DataFrame([[node, op_type,
                                      _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.input_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_params_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.input_memory_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_memory_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_memory_dict[node], add=True)]],
                                      columns=dataframe.columns)
