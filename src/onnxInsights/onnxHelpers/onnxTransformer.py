@@ -117,15 +117,15 @@ class ONNXTransformer:
         self.model_name = os.path.split(onnx_model_path)[-1].removesuffix(self.extension)
         
         # load onnx model from ssd
-        self.onnx_model = onnx.load(onnx_model_path)
+        # self.onnx_model = onnx.load(onnx_model_path)
         
-        try:
-            onnx.checker.check_model(self.onnx_model)
+        # try:
+        #     onnx.checker.check_model(self.onnx_model)
         
-        except Exception as ValueError:
-            onnx.checker.check_model(onnx_model_path)
+        # except Exception as ValueError:
+        #     onnx.checker.check_model(onnx_model_path)
 
-        self.onnx_graph = copy.deepcopy(self.onnx_model.graph)
+        # self.onnx_graph = copy.deepcopy(self.onnx_model.graph)
 
         self.node_input_dict = {}
         self.node_output_dict = {}
