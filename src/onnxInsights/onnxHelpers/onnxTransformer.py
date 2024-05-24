@@ -78,7 +78,8 @@ def checkandSaveModel(
 
 
 def _convert_shape_tuple_to_string(
-        tuple_of_tuple: tuple[tuple[Any]]
+        tuple_of_tuple: tuple[tuple[Any]],
+        add: bool = False
 ) -> str:
     output = ''
 
@@ -88,7 +89,13 @@ def _convert_shape_tuple_to_string(
         if i < len(tuple_of_tuple) - 1:
             output += ', '
     
-    return output
+    param_sum = 0
+
+    if add:
+        for out in output.split(', '):
+            param_sum += int(out)
+    
+    return param_sum if add else output
 
 
 class ONNXTransformer:
@@ -122,7 +129,7 @@ class ONNXTransformer:
 
         self.node_input_dict = {}
         self.node_output_dict = {}
-        self.node_weight_dict = {}
+        self.node_wb_dict = {}
 
 
     # adapted from https://github.com/onnx/onnx/blob/main/onnx/tools/update_model_dims.py
@@ -274,8 +281,8 @@ class ONNXTransformer:
             self,
             node_param_dict: dict
     ) -> tuple[dict, dict]:
-        input_params_dict = {}
-        input_memory_dict = {}
+        params_dict = {}
+        memory_dict = {}
 
         for node in node_param_dict:
             name, shape, size = node_param_dict[node]
@@ -290,10 +297,10 @@ class ONNXTransformer:
                 params_size += ((param_size.item(),),)
                 memory_size += (((param_size * size[i]).item(),),)
 
-            input_params_dict[node] = params_size
-            input_memory_dict[node] = memory_size
+            params_dict[node] = params_size if params_size else ((0,),)
+            memory_dict[node] = memory_size if memory_size else ((0,),)
         
-        return input_params_dict, input_memory_dict
+        return params_dict, memory_dict
 
 
     def profileGraph(
@@ -318,7 +325,6 @@ class ONNXTransformer:
 
         # tensor dict and weights-bias dict
         self.tensor_dict, self.wb_dict = self.updateTensorandWeightDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
-
 
         for i, node in enumerate(self.nodes):
             node_input_list = []
@@ -357,7 +363,7 @@ class ONNXTransformer:
 
             self.node_input_dict[node.name] = (tuple(node_input_list), input_shapes, input_size)
             
-            self.node_weight_dict[node.name] = (tuple(node_wb_list), wb_shapes, wb_size)
+            self.node_wb_dict[node.name] = (tuple(node_wb_list), wb_shapes, wb_size)
             
             # parse onnx gragh for outputs data
             for i, node_output in enumerate(node.output):
@@ -387,16 +393,23 @@ class ONNXTransformer:
         # params size and memory size for inputs and outputs
         self.input_params_dict, self.input_memory_dict = self.getMemoryInfo(self.node_input_dict)
 
+        self.wb_params_dict, self.wb_memory_dict = self.getMemoryInfo(self.node_wb_dict)
+
         self.output_params_dict, self.output_memory_dict = self.getMemoryInfo(self.node_output_dict)
 
-        dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Input Shape', 'Weight Shape', 'Output Shape', 'Output Params Size', 'Output Memory (in Bytes)'])
+        dataframe = pandas.DataFrame(columns=['Node', 'Operation', 'Inputs Shape', 'Weights and Bias Shape', 'Output Shape',
+                                              'Weights and Bias Params Size', 'Output Params Size',
+                                              'Weights and Bias Memory (in Bytes)', 'Output Memory (in Bytes)'])
 
         for i, (node, op_type) in enumerate(self.valid_nodes_list):
-            row = pandas.DataFrame([[node, op_type, _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.node_weight_dict[node][1]),
+            row = pandas.DataFrame([[node, op_type,
+                                     _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.output_params_dict[node]),
-                                     _convert_shape_tuple_to_string(self.output_memory_dict[node])]],
+                                     _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.output_params_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.wb_memory_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.output_memory_dict[node], add=True)]],
                                      columns=dataframe.columns)
             
             dataframe = pandas.concat([dataframe, row], ignore_index=True)
