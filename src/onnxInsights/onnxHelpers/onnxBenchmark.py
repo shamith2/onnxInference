@@ -1,5 +1,4 @@
 # This script contains functions for converting PyTorch model to ONNX, benchmarking ONNX models using ONNXRuntime, Quantizing and Performance Analysis of ONNX models
-# Version: v1.0.0
 
 from collections import deque
 from datetime import datetime
