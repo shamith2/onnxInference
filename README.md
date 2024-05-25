@@ -6,7 +6,7 @@ Getting to know more about onnx models: insights into their performance and bott
 
 - stable-diffusion = scripts to run stable diffusion pipeline, currently on running on CPU + DirectML-supported devices
 
-![image](https://github.com/shamith2/ryzenAI/assets/43729418/086c4869-51d3-4b1e-8473-165cadf29647)
+![image](https://github.com/shamith2/onnxInsights/blob/db91c3483d4ad8f8ab8d5dc2a1379b03268bebb3/results/stableDiffusion/sd_turbo_results/SD%202.1%20Turbo_visualize_1.png)
 
 For running and testing onnx models, I am currently running them on AMD Ryzen APUs using Radeon iGPU + Ryzen AI processor
 refer to https://ryzenai.docs.amd.com/en/latest/inst.html for installation and config files
