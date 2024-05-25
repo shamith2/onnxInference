@@ -494,7 +494,9 @@ class ONNXTransformer:
                                        'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(
                                     ['Operator']).sum().reset_index()
 
+        # operator count and percent
         grouped_dataframe.insert(1, 'Count', list(self.count_operators.values()))
+        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100) / grouped_dataframe['Count'].sum()).round(2))
 
         # total
         grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True)
