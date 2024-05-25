@@ -16,7 +16,7 @@ import shutil
 import onnxruntime
 from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
 
-from onnxBenchmark import get_random_input
+from .onnxBenchmark import get_random_input
 
 import pandas
 
@@ -110,12 +110,16 @@ class ONNXTransformer:
     ):
         self.extension = '.onnx'
 
+        self.root = Path(__file__).parents[3].resolve()
         self.workspace = Path(__file__).parent.resolve()
 
-        self.debug_directory = os.path.join(self.workspace, 'debug')
+        self.prof_directory = os.path.join(self.root, 'results', 'onnxProfile')
+        self.infer_model_directory = os.path.join(self.prof_directory, 'models')
+        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs')
 
-        if not os.path.exists(self.debug_directory):
-            os.makedirs(self.debug_directory)
+        for p in [self.prof_directory, self.infer_model_directory, self.profile_logs_directory]:
+            if not os.path.exists(p):
+                os.makedirs(p)
 
         self.node_input_dict = {}
         self.node_output_dict = {}
@@ -181,9 +185,12 @@ class ONNXTransformer:
 
     def _verify_inputs_and_outputs(
         self,
+        onnx_model_path: str,
         static_input_dims: list,
         static_output_dims: list
     ) -> str:
+        self.onnx_model = onnx.load(onnx_model_path)
+
         for i, model_input in enumerate(self.onnx_model.graph.input):
             input_name = model_input.name
             
@@ -196,11 +203,11 @@ class ONNXTransformer:
             for j, dim in enumerate(static_output_dims[i]):
                 self._update_dim(model_output, dim, j, output_name)
 
-        intermediate_onnx_file = 'intermediate'
+        intermediate_onnx_file = self.model_name + '_intermediate'
         
-        save_path = os.path.join(self.debug_directory, intermediate_onnx_file + self.extension)
+        save_path = os.path.join(self.infer_model_directory, intermediate_onnx_file + self.extension)
 
-        assert checkandSaveModel(self.onnx_model, self.extension, self.debug_directory, intermediate_onnx_file) == 0, "checkandSaveModel() failed"
+        assert checkandSaveModel(self.onnx_model, self.extension, self.infer_model_directory, intermediate_onnx_file) == 0, "checkandSaveModel() failed"
 
         return save_path
 
@@ -215,30 +222,33 @@ class ONNXTransformer:
 
     def shapeInfer(
             self,
+            model_name: str,
+            onnx_model_file: str,
             static_input_dims: list,
             static_output_dims: list
-    ) -> int:  
-        onnx_model_file = self._verify_inputs_and_outputs(static_input_dims, static_output_dims)
+    ) -> str:
+        self.model_name = model_name
+
+        intermediate_model_file = self._verify_inputs_and_outputs(onnx_model_file, static_input_dims, static_output_dims)
 
         logger.info("Performing symbolic shape inference")
         
-        self.inferred_model = SymbolicShapeInference.infer_shapes(
-            onnx.load(onnx_model_file),
+        inferred_model = SymbolicShapeInference.infer_shapes(
+            onnx.load(intermediate_model_file),
             int_max=2**31 - 1,
             auto_merge=False,
             guess_output_rank=False,
-            verbose=0,
+            verbose=0
         )
 
-        assert checkandSaveModel(self.inferred_model, self.extension, self.workspace, 'inferred') == 0, "checkandSaveModel() failed"
+        inferred_model_file = os.path.join(self.infer_model_directory, self.model_name + '_inferred' + self.extension)
 
-        # import shutil
-        # shutil.rmtree(self.debug_directory)
+        assert checkandSaveModel(inferred_model, self.extension, self.infer_model_directory, self.model_name + '_inferred') == 0, "checkandSaveModel() failed"
 
-        os.remove(onnx_model_file)
-        os.remove(onnx_model_file.removesuffix(self.extension) + '.onnx_data')
+        os.remove(intermediate_model_file)
+        os.remove(intermediate_model_file.removesuffix(self.extension) + '.onnx_data')
 
-        return 0
+        return inferred_model_file
 
 
     def updateTensorandWeightDict(
@@ -325,7 +335,7 @@ class ONNXTransformer:
         
         prof_file = ort_session.end_profiling()
 
-        prof_path = os.path.join(self.debug_directory, prof_file)
+        prof_path = os.path.join(self.prof_directory, prof_file)
 
         shutil.move(os.path.join(self.workspace, prof_file), prof_path)
 
@@ -335,7 +345,7 @@ class ONNXTransformer:
     def profileGraph(
             self,
             graph: onnx.GraphProto
-    ):
+    ) -> int:
         # list of onnx.NodeProto
         self.nodes = graph.node
 
@@ -434,6 +444,8 @@ class ONNXTransformer:
 
         # summarize
         self.summarize()
+
+        return 0
     
 
     def summarize(
@@ -503,11 +515,11 @@ class ONNXTransformer:
 
         grouped_dataframe = grouped_dataframe.round(2)
        
-        dataframe.to_csv(os.path.join(self.debug_directory, 'summary.csv'), index=False)
+        dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False)
 
-        grouped_dataframe.to_csv(os.path.join(self.debug_directory, 'grouped_summary.csv'), index=False)
+        grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False)
 
-        print(self.render(self.debug_directory, 'summary.csv'))
+        logging.info('Use this command "{}" to view the profiling summary in PowerShell on Windows'.format(self.render(self.profile_logs_directory, self.model_name + '_summary.csv')))
 
 
     def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):
