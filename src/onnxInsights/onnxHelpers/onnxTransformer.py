@@ -11,9 +11,12 @@ from onnx.helper import tensor_dtype_to_string
 from typing import Any
 from pathlib import Path
 
-import subprocess
+import shutil
 
+import onnxruntime
 from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
+
+from onnxBenchmark import get_random_input
 
 import pandas
 
@@ -288,6 +291,54 @@ class ONNXTransformer:
             memory_dict[node] = memory_size if memory_size else ((0,),)
         
         return params_dict, memory_dict
+    
+
+    def calculateMACS(
+            self
+    ):
+        # 'OPERATOR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}
+        
+
+        raise NotImplementedError
+    
+
+    def profileModel(
+            self,
+            onnx_model_path: str
+    ):
+        sess_options = onnxruntime.SessionOptions()
+
+        sess_options.intra_op_num_threads = 1
+        sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+        sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+
+        sess_options.enable_profiling = True
+
+        ort_session = onnxruntime.InferenceSession(
+                onnx_model_path,
+                providers=["CPUExecutionProvider"],
+                sess_options=sess_options
+            )
+        
+        # model inputs and outputs
+        output_feed = [x.name for x in ort_session.get_outputs()]
+
+        input_feed = {}
+
+        for model_input in ort_session.get_inputs():
+            input_feed[model_input.name] = get_random_input(model_input.shape, model_input.type)
+
+        ort_session.run(output_feed, input_feed)
+        
+        prof_file = ort_session.end_profiling()
+
+        prof_path = os.path.join(self.debug_directory, prof_file)
+
+        shutil.move(os.path.join(self.workspace, prof_file), prof_path)
+
+        return prof_path
 
 
     def profileGraph(
@@ -462,7 +513,7 @@ class ONNXTransformer:
 
         grouped_dataframe.to_csv(os.path.join(self.debug_directory, 'grouped_summary.csv'), index=False)
 
-        print(self.render(self.debug_directory, 'grouped_summary.csv'))
+        print(self.render(self.debug_directory, 'summary.csv'))
 
 
     def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):
@@ -558,6 +609,8 @@ if __name__ == '__main__':
     onnx_t = ONNXTransformer()
 
     # onnx_t.shapeInfer([(1, 4, 64, 64), (1,), (1, 77, 1024)], [(1, 4, 64, 64)])
+
+    # onnx_t.profileModel(os.path.join('.', 'inferred.onnx'))
 
     onnx_t.profileGraph(onnx.load(os.path.join('.', 'inferred.onnx')).graph)
     

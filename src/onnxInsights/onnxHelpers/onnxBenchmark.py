@@ -41,22 +41,28 @@ def check_install_dir(voe_dir: str):
     
     return True
 
-# infer the correct dtype for inputs and outputs
-def get_correct_dtype(input_type: str):
-    if input_type == "(float16)":
+# infer the numpy dtype for inputs and outputs
+def get_numpy_dtype(input_type: str):
+    if input_type == "tensor(float16)":
         return np.float16
 
-    elif input_type == "(float)":
+    elif input_type == "tensor(float)":
         return np.float32
+    
+    elif input_type == "tensor(long)" or input_type == "tensor(int64)":
+        return np.int64
 
-    elif input_type == "(double)":
+    elif input_type == "tensor(double)":
         return np.double
-
-    elif input_type == "(long)":
-        return np.int_
+    
+    elif input_type == "tensor(int32)":
+        return np.int32
+    
+    elif input_type == "tensor(uint)":
+        return np.uint8
 
     else:
-        return
+        return np.float64
 
 
 # generate random input images instead of real images; batch size = 1
@@ -66,8 +72,8 @@ def get_random_input(
         input_type: str,
         batch_size: int = 1
 ):
-    input_data = 255.0 * np.random.random_sample([batch_size] + input_shape[1:]).astype(
-        get_correct_dtype(re.search(r"\((.*)\)", input_type).group(0)))
+    input_data = (255 * np.random.random_sample([batch_size] + input_shape[1:])).astype(
+        get_numpy_dtype(input_type))
 
     return input_data
 
