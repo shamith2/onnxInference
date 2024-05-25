@@ -293,15 +293,6 @@ class ONNXTransformer:
         return params_dict, memory_dict
     
 
-    def calculateMACS(
-            self
-    ):
-        # 'OPERATOR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}
-        
-
-        raise NotImplementedError
-    
-
     def profileModel(
             self,
             onnx_model_path: str
@@ -359,7 +350,7 @@ class ONNXTransformer:
         self.model_weights = graph.initializer
 
         # operator and tensor dicts
-        self.count_operators = {}
+        self.unsorted_count_operators = {}
 
         # tensor dict and weights-bias dict
         self.tensor_dict, self.wb_dict = self.updateTensorandWeightDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
@@ -421,11 +412,17 @@ class ONNXTransformer:
                 self.valid_nodes_list.remove((node.name, node.op_type))
 
             
-            if self.count_operators.get(node.op_type, None) is None:
-                self.count_operators[node.op_type] = 1
+            if self.unsorted_count_operators.get(node.op_type, None) is None:
+                self.unsorted_count_operators[node.op_type] = 1
             
             else:
-                self.count_operators[node.op_type] += 1
+                self.unsorted_count_operators[node.op_type] += 1
+        
+
+        # sort based on operators, in alphabetical order
+        operators = list(self.unsorted_count_operators.keys())
+        operators.sort()
+        self.count_operators = {op: int(self.unsorted_count_operators[op]) for op in operators}
 
 
         # params size and memory size for inputs and outputs
@@ -437,13 +434,6 @@ class ONNXTransformer:
 
         # summarize
         self.summarize()
-        
-        
-        # from matplotlib import pyplot as plt
-        # plt.barh(self.count_operators.keys(), self.count_operators.values(), 1, color='g')
-        # plt.show()
-        
-        raise NotImplementedError
     
 
     def summarize(
@@ -503,6 +493,8 @@ class ONNXTransformer:
                                        'Weights and Bias Memory (in Bytes)', 'Weights and Bias Memory (%)',
                                        'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(
                                     ['Operator']).sum().reset_index()
+
+        grouped_dataframe.insert(1, 'Count', list(self.count_operators.values()))
 
         # total
         grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True)
