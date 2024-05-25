@@ -597,15 +597,3 @@ class ONNXTransformer:
         
         onnx.save_model(self.onnx_model, self.model_name + '_modified.onnx')
 
-
-# for testing
-if __name__ == '__main__':
-    onnx_t = ONNXTransformer()
-
-    # onnx_t.shapeInfer([(1, 4, 64, 64), (1,), (1, 77, 1024)], [(1, 4, 64, 64)])
-
-    # onnx_t.profileModel(os.path.join('.', 'inferred.onnx'))
-
-    onnx_t.profileGraph(onnx.load(os.path.join('.', 'inferred.onnx')).graph)
-    
-    # onnx_t.modifyGraph(delete_block=['DequantizeLinear', 'Clip', 'QuantizeLinear'], upper_2_ok=False, only_middle=True)
