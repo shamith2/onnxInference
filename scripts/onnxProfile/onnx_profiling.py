@@ -15,7 +15,7 @@ uninferred_onnx_model_path = os.path.join(workspace, 'models', 'model.onnx')
 
 inferred_onnx_model_path = onnx_t.shapeInfer('sd_unet', uninferred_onnx_model_path, [(1, 4, 64, 64), (1,), (1, 77, 1024)], [(1, 4, 64, 64)])
 
-onnx_t.profileGraph(onnx.load(inferred_onnx_model_path).graph)
+onnx_t.profileMemory(onnx.load(inferred_onnx_model_path))
 
 # onnx_t.profileModel(os.path.join('.', 'inferred.onnx'))
 

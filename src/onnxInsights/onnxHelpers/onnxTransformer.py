@@ -342,10 +342,12 @@ class ONNXTransformer:
         return prof_path
 
 
-    def profileGraph(
+    def profileMemory(
             self,
-            graph: onnx.GraphProto
+            onnx_model: onnx.ModelProto
     ) -> int:
+        graph = onnx_model.graph
+
         # list of onnx.NodeProto
         self.nodes = graph.node
 
