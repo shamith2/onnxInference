@@ -17,6 +17,6 @@ inferred_onnx_model_path = onnx_t.shapeInfer('sd_unet', uninferred_onnx_model_pa
 
 onnx_t.profileMemory(inferred_onnx_model_path)
 
-# onnx_t.profileModel(os.path.join('.', 'inferred.onnx'))
+# onnx_t.profileModel(inferred_onnx_model_path)
 
 # onnx_t.modifyGraph(delete_block=['DequantizeLinear', 'Clip', 'QuantizeLinear'], upper_2_ok=False, only_middle=True)
