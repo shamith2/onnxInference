@@ -344,9 +344,10 @@ class ONNXTransformer:
 
     def profileMemory(
             self,
-            onnx_model: onnx.ModelProto
+            onnx_model_path: str
     ) -> int:
-        graph = onnx_model.graph
+        # onnx model graph for profiling
+        graph = onnx.load(onnx_model_path).graph
 
         # list of onnx.NodeProto
         self.nodes = graph.node
