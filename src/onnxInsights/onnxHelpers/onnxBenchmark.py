@@ -128,7 +128,7 @@ class ImageCalibrationData(CalibrationDataReader):
         # input data size := (b, h, w, c)
         for (input_shape, input_type) in self.input_dict.values():
             yield np.zeros([0] + input_shape[1:],
-                           dtype=get_correct_dtype(re.search(r"\((.*)\)", input_type).group(0)))
+                           dtype=get_numpy_dtype(input_type))
 
     def get_input_batch(self):
         input_batch = []
