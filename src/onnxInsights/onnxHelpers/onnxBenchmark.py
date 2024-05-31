@@ -525,7 +525,7 @@ class ONNXInference:
                         num_threads: int = 8,
                         inf_mode: str = 'fp32',
                         verbosity: int = 3,
-                        intra_threads: int = 1
+                        intra_threads: int = 0
     ):
         if inf_mode == 'ryzen-ai':
             onnx_model_path = os.path.join(self.ryzen_ai_onnx_dir, self.model_name + '_int8.onnx')
