@@ -475,33 +475,37 @@ class ONNXTransformer:
             dataframe = pandas.concat([dataframe, row], ignore_index=True)
         
         # type-cast
-        dataframe['Number of Params'] = dataframe['Number of Params'].astype(numpy.int64)
-        dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype(numpy.int64)
-        dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype(numpy.int64)
-        dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype(numpy.int64)
+        dataframe['Number of Params'] = dataframe['Number of Params'].astype('int64')
+        dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype('int64')
+        dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype('int64')
+        dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
         
         # params percent
-        dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100) / dataframe['Number of Params'].sum()).round(2))
+        dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100.0).astype('float64') / dataframe['Number of Params'].sum()).astype('float64').round(5))
 
         # memory
         dataframe.insert(4, 'Memory (in Bytes)', dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)'])
-
-        # type-cast
-        dataframe['Memory (in Bytes)'] = dataframe['Memory (in Bytes)'].astype(numpy.int64)
+        dataframe['Memory (in Bytes)'] = dataframe['Memory (in Bytes)'].astype('int64')
 
         # memory percent
-        dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100) / dataframe['Memory (in Bytes)'].sum()).round(2))
+        dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(5))
 
-        dataframe.insert(6, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100) / 
+        dataframe.insert(6, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
-                                                   dataframe['Output Memory (in Bytes)'].sum())).round(2))
+                                                   dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(5))
         
-        dataframe.insert(7, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100) / 
+        dataframe.insert(7, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
-                                                   dataframe['Output Memory (in Bytes)'].sum())).round(2))
+                                                   dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(5))
+        
+        # Memory in MB
+        dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(0).astype('int64')
+        dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(0).astype('int64')
+        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)'])
+        dataframe['Memory (in MB)'] = dataframe['Memory (in MB)'].astype('int64')
 
         # total
-        dataframe.loc['Total'] = dataframe.sum(numeric_only=True).round(2)
+        dataframe.loc['Total'] = dataframe.sum(numeric_only=True).astype('float64').round(2)
 
         # grouping by operator
         grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)',
