@@ -481,30 +481,29 @@ class ONNXTransformer:
         dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
         
         # params percent
-        dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100.0).astype('float64') / dataframe['Number of Params'].sum()).astype('float64').round(5))
+        dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100.0).astype('float64') / dataframe['Number of Params'].sum()).astype('float64').round(3))
 
         # memory
-        dataframe.insert(4, 'Memory (in Bytes)', dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)'])
-        dataframe['Memory (in Bytes)'] = dataframe['Memory (in Bytes)'].astype('int64')
+        dataframe.insert(4, 'Memory (in Bytes)', (dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)']).astype('int64'))
 
         # memory percent
-        dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(5))
+        dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
 
         dataframe.insert(6, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
-                                                   dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(5))
+                                                   dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
         
         dataframe.insert(7, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
-                                                   dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(5))
+                                                   dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
         
         # Memory in MB
-        dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(5)
-        dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(5)
-        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('float64').round(5)
+        dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(6)
+        dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(6)
+        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('float64').round(6)
 
         # total
-        dataframe.loc['Total'] = dataframe.sum(numeric_only=True).astype('float64').round(2)
+        dataframe.loc['Total'] = dataframe.sum(numeric_only=True).round(0)
 
         # grouping by operator
         grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)',
@@ -514,12 +513,12 @@ class ONNXTransformer:
 
         # operator count and percent
         grouped_dataframe.insert(1, 'Count', list(self.count_operators.values()))
-        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100) / grouped_dataframe['Count'].sum()).round(2))
+        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100) / grouped_dataframe['Count'].sum()).round(3))
 
         # total
-        grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True)
+        grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True).round(0)
 
-        grouped_dataframe = grouped_dataframe.round(2)
+        grouped_dataframe = grouped_dataframe.round(3)
        
         dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False)
 
