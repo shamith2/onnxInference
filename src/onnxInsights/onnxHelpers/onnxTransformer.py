@@ -499,10 +499,9 @@ class ONNXTransformer:
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(5))
         
         # Memory in MB
-        dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(0).astype('int64')
-        dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(0).astype('int64')
-        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)'])
-        dataframe['Memory (in MB)'] = dataframe['Memory (in MB)'].astype('int64')
+        dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(5)
+        dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(5)
+        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('float64').round(5)
 
         # total
         dataframe.loc['Total'] = dataframe.sum(numeric_only=True).astype('float64').round(2)
