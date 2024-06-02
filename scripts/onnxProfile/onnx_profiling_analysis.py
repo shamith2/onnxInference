@@ -22,7 +22,7 @@ if not os.path.exists(save_directory):
 
 table = pandas.read_csv(filepath)
 
-output_memory = table['Output Memory (in MB)'][:-1].to_numpy(dtype=numpy.float64)
+output_memory = table['Output Memory (in Bytes)'][:-1].to_numpy(dtype=numpy.int64)
 total_memory = table['Memory (in MB)'][:-1].to_numpy(dtype=numpy.float64)
 
 main_memory_total_memory_accesses = 0
@@ -67,14 +67,13 @@ for i, element in enumerate(total_memory):
     else:
         memory_usage[key] += 1
 
-        if math.isclose(output_memory[i-1], element, rel_tol=1e-1):
+        if output_memory[i-1] == output_memory[i]:
             consecutive_output_memory_usage[key] += 1
 
 
 # sort output_memory_usage by keys
 def sortDict(dictionary):
     elements = list(dictionary.keys())
-
     elements.sort(key=lambda x: int(x[0]))
     
     sorted_dictionary = {element: int(dictionary[element]) for element in elements}
