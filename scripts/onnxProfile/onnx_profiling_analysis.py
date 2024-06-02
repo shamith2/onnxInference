@@ -3,6 +3,7 @@
 import os
 import sys
 
+import math
 import numpy
 import pandas
 
@@ -29,7 +30,6 @@ memory_usage = {}
 consecutive_output_memory_usage = {}
 optimized_memory_usage = {}
 histogram_dict = {}
-ordered_histogram_dict = {}
 
 try:
     model_name = sys.argv[1]
@@ -39,23 +39,43 @@ except IndexError:
     raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [size of NPU on-chip memory in MB]")
     sys.exit()
 
+
+def getDictKey(element, threshold):
+    ceil_elem = math.ceil(element)
+
+    if ceil_elem == 0:
+        return '0', '0'
+    
+    if ceil_elem == 1:
+        return '1', '(0,1]'
+    
+    elif element > threshold:
+        return str(ceil_elem), '>' + str(threshold)
+
+    else:
+        return str(ceil_elem), '(' + str(ceil_elem - 1) + ',' + str(ceil_elem) + ']'
+
+
 # optimize operators having consecutive same output memory size
 for i, element in enumerate(total_memory):
-    if memory_usage.get(str(element), None) is None:
-        memory_usage[str(element)] = 1
-        consecutive_output_memory_usage[str(element)] = 0
+    key = getDictKey(element, threshold)
+
+    if memory_usage.get(key, None) is None:
+        memory_usage[key] = 1
+        consecutive_output_memory_usage[key] = 0
     
     else:
-        memory_usage[str(element)] += 1
+        memory_usage[key] += 1
 
-        if output_memory[i-1] == element:
-            consecutive_output_memory_usage[str(element)] += 1
+        if math.isclose(output_memory[i-1], element):
+            consecutive_output_memory_usage[key] += 1
 
 
 # sort output_memory_usage by keys
 def sortDict(dictionary):
     elements = list(dictionary.keys())
-    elements.sort(key=int)
+
+    elements.sort(key=lambda x: int(x[0]))
     
     sorted_dictionary = {element: int(dictionary[element]) for element in elements}
 
@@ -69,35 +89,36 @@ for element in sorted_memory_usage:
 
 
 if threshold:
+    threshold_key = '>' + str(threshold)
+
     for element in optimized_memory_usage:
-        if int(element) <= threshold:
+        if int(element[0]) <= threshold:
             histogram_dict[element] = optimized_memory_usage[element]
         
         else:
-            if histogram_dict.get('>' + str(threshold), None) is None:
-                histogram_dict['>' + str(threshold)] = optimized_memory_usage[element]
+            if histogram_dict.get(threshold_key, None) is None:
+                histogram_dict[threshold_key] = optimized_memory_usage[element]
             
             else:
-                histogram_dict['>' + str(threshold)] += optimized_memory_usage[element]
+                histogram_dict[threshold_key] += optimized_memory_usage[element]
             
-            main_memory_total_memory_accesses += int(element) * optimized_memory_usage[element]
+            main_memory_total_memory_accesses += int(element[0]) * optimized_memory_usage[element]
+    
+    histogram_dict[(threshold_key, threshold_key)] = histogram_dict.pop(threshold_key)
 
-    ordered_histogram_dict['<1'] = histogram_dict.pop('0')
-    ordered_histogram_dict.update(histogram_dict)
 
-
-max_operator_memory = max([int(key) for key in optimized_memory_usage.keys()])
+max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
 
 print('Insights for {}:'.format(model_name))
 print('Maximum Memory Size of any Operator: {} MB'.format(max_operator_memory))
 print('Total Memory of Operators that have memory size > {} MB: {} MB'.format(threshold, main_memory_total_memory_accesses))
 
-if ordered_histogram_dict:
+if histogram_dict:
     fig, ax = plt.subplots(figsize=(12, 12))
 
-    num_keys = len(ordered_histogram_dict)
-    keys = list(ordered_histogram_dict.keys())
-    values = list(ordered_histogram_dict.values())
+    num_keys = len(histogram_dict)
+    _, keys = zip(*histogram_dict.keys())
+    values = list(histogram_dict.values())
     plot_keys = []
     plot_values = []
 
