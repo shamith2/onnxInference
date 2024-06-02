@@ -114,7 +114,7 @@ if threshold:
 
     print('Insights for {}:'.format(model_name))
     print('Maximum Memory Size of any Operator: {} MB'.format(max_operator_memory))
-    print('Total Memory of Operators that have memory size > {} MB: {} MB'.format(threshold, round(histogram_dict2[(threshold_key, threshold_key)])))
+    print('Total Memory of Operators that have memory size > {} MB: {} MB'.format(threshold, round(histogram_dict2[(threshold_key, threshold_key)], 0)))
 
 if histogram_dict1 and histogram_dict2:
     num_keys = len(histogram_dict1)
@@ -150,11 +150,28 @@ if histogram_dict1 and histogram_dict2:
             plot_weighed_keys.append(keys[j])
             plot_weighed_values.append(weighed_values[j])
 
+    threshold_key = '>' + str(threshold)
+    identifier_idx1 = plot_keys.index(threshold_key)
+    identifier_idx2 = plot_weighed_keys.index(threshold_key)
+
     explode1 = [0] * len(plot_keys)
-    explode1[-1] = 0.1
+    explode1[identifier_idx1] = 0.1
 
     explode2 = [0] * len(plot_weighed_keys)
-    explode2[-1] = 0.1
+    explode2[identifier_idx2] = 0.1
+
+    identifier1 = (plot_values[identifier_idx1] * 100.0) / sum(plot_values)
+    identifier2 = (plot_weighed_values[identifier_idx2] * 100.0) / sum(plot_weighed_values)
+
+    def pctPrint(pct, allvals, identifier):
+        absolute = int(numpy.round(pct / 100.0 * numpy.sum(allvals)))
+        value = int(round(pct, 0))
+        
+        if math.isclose(pct, identifier, rel_tol=1e-5):
+            return '{}%\n{} MB'.format(value, absolute)
+        
+        else:
+            return '{}%'.format(value)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 18))
     
@@ -162,7 +179,7 @@ if histogram_dict1 and histogram_dict2:
         plot_values,
         explode=explode1,
         labels=[key + ' MB' for key in plot_keys],
-        autopct='%1d%%',
+        autopct=lambda pct: pctPrint(pct, plot_values, identifier1),
         wedgeprops={'edgecolor': 'black'},
         textprops={'fontsize': 12, 'fontweight': 'bold'},
         startangle=90
@@ -172,7 +189,7 @@ if histogram_dict1 and histogram_dict2:
         plot_weighed_values,
         explode=explode2,
         labels=[key + ' MB' for key in plot_weighed_keys],
-        autopct='%1d%%',
+        autopct=lambda pct: pctPrint(pct, plot_weighed_values, identifier2),
         wedgeprops={'edgecolor': 'black'},
         textprops={'fontsize': 12, 'fontweight': 'bold'},
         startangle=180
