@@ -67,7 +67,7 @@ for i, element in enumerate(total_memory):
     else:
         memory_usage[key] += 1
 
-        if math.isclose(output_memory[i-1], element, rel_tol=1e-3):
+        if math.isclose(output_memory[i-1], element, rel_tol=1e-1):
             consecutive_output_memory_usage[key] += 1
 
 
