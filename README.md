@@ -10,8 +10,8 @@ Getting to know more about onnx models: insights into their performance and bott
 ![image](https://github.com/shamith2/onnxInsights/blob/db91c3483d4ad8f8ab8d5dc2a1379b03268bebb3/results/stableDiffusion/sd_turbo_results/SD%202.1%20Turbo_visualize_1.png)
 
 ### ONNX Model Static Memory Profiling:
-  * #### Stable Diffusion UNet:
-    * Profiling Operator-wise Grouped Summary: ![profile-grouped-summary-csv](https://github.com/shamith2/onnxInsights/blob/main/results/onnxProfile/logs/sd_unet_grouped_summary.csv)
+  * #### Stable Diffusion XL Turbo UNet:
+    * Profiling Operator-wise Grouped Summary: ![profile-grouped-summary-csv](https://github.com/shamith2/onnxInsights/blob/main/results/onnxProfile/logs/sdxlt_unet_grouped_summary.csv)
 
 
 For running and testing onnx models, I am currently running them on AMD Ryzen APUs using Radeon iGPU + Ryzen AI processor
