@@ -211,7 +211,7 @@ if histogram_dict1 and histogram_dict2:
 
     max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
 
-    fig, ax = plt.subplots(figsize=(36, 12))
+    fig, ax = plt.subplots(figsize=(96, 24))
 
     ax.scatter(
         x,
@@ -228,7 +228,7 @@ if histogram_dict1 and histogram_dict2:
 
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or Last-level cache\n\nMaximum Memory Size of any Operator in the model: {} MB\n'.format(max_operator_memory),
+                 '(on-chip memory) with no NPU or Last-level cache\n\nMaximum Memory Size of any Operator in the model: {} MB\n\n'.format(max_operator_memory),
                  fontweight='bold')
 
     ax.set_title('Memory Size of Operators (> {} MB)'.format(threshold))
