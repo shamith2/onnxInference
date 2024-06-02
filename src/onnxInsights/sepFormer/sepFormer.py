@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import math
 import torch
 
-import onnxHelpers.onnxBenchmark import ONNXInference
+from ..onnxHelpers import ONNXInference
 
 # seed
 torch.manual_seed(43)
