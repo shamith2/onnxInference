@@ -122,7 +122,8 @@ if ordered_histogram_dict:
         autopct='%1d%%',
         wedgeprops={'edgecolor': 'black'},
         textprops={'fontsize': 12, 'fontweight': 'bold'},
-        startangle=90)
+        startangle=90
+    )
     
     plt.setp(pcts, size=14, color='white', fontweight='bold')
 
