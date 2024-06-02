@@ -224,7 +224,7 @@ if histogram_dict1 and histogram_dict2:
     plt.setp(ax.get_xticklabels(), rotation=90)
     
     ax.set_xlabel('Operator')
-    ax.set_ylabel('Operator Memory Size (> {} MB) [in MB]'.format(threshold))
+    ax.set_ylabel('Operator Memory Size [in MB]')
 
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
