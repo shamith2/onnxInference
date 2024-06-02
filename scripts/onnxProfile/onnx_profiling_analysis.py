@@ -152,7 +152,7 @@ if histogram_dict:
 
     ax.set_title('Should Weights + Output of an Operator\nbe stored in Main Memory ' + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or SLC cache\n')
+                 '(on-chip memory) with no NPU or Last-level cache\n')
 
     plt.tight_layout()
 
