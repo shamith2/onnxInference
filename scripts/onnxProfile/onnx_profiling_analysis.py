@@ -87,13 +87,6 @@ sorted_consecutive_output_memory_usage = sortDict(consecutive_output_memory_usag
 for element in sorted_memory_usage:
     optimized_memory_usage[element] = sorted_memory_usage[element] - sorted_consecutive_output_memory_usage[element]
 
-print(sorted_memory_usage)
-print()
-print(sorted_consecutive_output_memory_usage)
-print()
-print(optimized_memory_usage)
-print()
-
 
 if threshold:
     threshold_key = '>' + str(threshold)
