@@ -498,9 +498,9 @@ class ONNXTransformer:
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
         
         # Memory in MB
-        dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(6)
-        dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(6)
-        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('float64').round(6)
+        dataframe['Weights and Bias Memory (in MB)'] = numpy.ceil((dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64')).astype(numpy.int64)
+        dataframe['Output Memory (in MB)'] = numpy.ceil((dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64')).astype(numpy.int64)
+        dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('int64')
 
         # total
         dataframe.loc['Total'] = dataframe.sum(numeric_only=True).round(0)
@@ -513,7 +513,7 @@ class ONNXTransformer:
 
         # operator count and percent
         grouped_dataframe.insert(1, 'Count', list(self.count_operators.values()))
-        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100.0).astype('float64') / grouped_dataframe['Count'].sum()).round(3))
+        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100.0).astype('float64') / grouped_dataframe['Count'].sum()).astype('float64').round(3))
 
         # total
         grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True).round(0)
