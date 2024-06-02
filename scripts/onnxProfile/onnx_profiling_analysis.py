@@ -14,7 +14,7 @@ from pathlib import Path
 root = Path(__file__).parents[2].resolve()
 workspace = Path(__file__).parent.resolve()
 
-filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', 'sdxlt_unet_summary_analysis.csv')
+filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', 'sdxlt_unet_summary.csv')
 save_directory = os.path.join(root, 'results', 'onnxProfile', 'plots')
 
 if not os.path.exists(save_directory):
