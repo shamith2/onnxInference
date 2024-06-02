@@ -22,8 +22,8 @@ if not os.path.exists(save_directory):
 
 table = pandas.read_csv(filepath)
 
-output_memory = table['Output Memory (in MB)'][:-1].to_numpy(dtype=numpy.int64)
-total_memory = table['Memory (in MB)'][:-1].to_numpy(dtype=numpy.int64)
+output_memory = table['Output Memory (in MB)'][:-1].to_numpy(dtype=numpy.float64)
+total_memory = table['Memory (in MB)'][:-1].to_numpy(dtype=numpy.float64)
 
 main_memory_total_memory_accesses = 0
 memory_usage = {}
@@ -49,7 +49,7 @@ def getDictKey(element, threshold):
     if ceil_elem == 1:
         return '1', '(0,1]'
     
-    elif element > threshold:
+    elif element > threshold * 1.0:
         return str(ceil_elem), '>' + str(threshold)
 
     else:
@@ -67,7 +67,7 @@ for i, element in enumerate(total_memory):
     else:
         memory_usage[key] += 1
 
-        if math.isclose(output_memory[i-1], element):
+        if math.isclose(output_memory[i-1], element, rel_tol=1e-3):
             consecutive_output_memory_usage[key] += 1
 
 
@@ -86,6 +86,13 @@ sorted_consecutive_output_memory_usage = sortDict(consecutive_output_memory_usag
 
 for element in sorted_memory_usage:
     optimized_memory_usage[element] = sorted_memory_usage[element] - sorted_consecutive_output_memory_usage[element]
+
+print(sorted_memory_usage)
+print()
+print(sorted_consecutive_output_memory_usage)
+print()
+print(optimized_memory_usage)
+print()
 
 
 if threshold:
