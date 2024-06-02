@@ -36,8 +36,8 @@ try:
     threshold = int(sys.argv[2])
 
 except IndexError:
-    model_name = 'Test'
-    threshold = 0
+    raise Exception("[Usage] > python onnx_profiling_analysis.py [model name] [size of on-chip memory in MB]")
+    sys.exit()
 
 # optimize operators having consecutive same output memory size
 for i, element in enumerate(total_memory):
@@ -88,7 +88,7 @@ if threshold:
 
 max_operator_memory = max([int(key) for key in optimized_memory_usage.keys()])
 
-print('Insights:')
+print('Insights for {}:'.format(model_name))
 print('Maximum Memory Size of any Operator: {} MB'.format(max_operator_memory))
 print('Total Memory of Operators that have memory size > {} MB: {} MB'.format(threshold, main_memory_total_memory_accesses))
 
