@@ -110,11 +110,6 @@ if threshold:
     histogram_dict1[(threshold_key, threshold_key)] = histogram_dict1.pop(threshold_key)
     histogram_dict2[(threshold_key, threshold_key)] = histogram_dict2.pop(threshold_key)
 
-    max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
-
-    print('Insights for {}:'.format(model_name))
-    print('Maximum Memory Size of any Operator: {} MB'.format(max_operator_memory))
-    print('Total Memory of Operators that have memory size > {} MB: {} MB'.format(threshold, round(histogram_dict2[(threshold_key, threshold_key)], 0)))
 
 if histogram_dict1 and histogram_dict2:
     num_keys = len(histogram_dict1)
@@ -163,23 +158,23 @@ if histogram_dict1 and histogram_dict2:
     identifier1 = (plot_values[identifier_idx1] * 100.0) / sum(plot_values)
     identifier2 = (plot_weighed_values[identifier_idx2] * 100.0) / sum(plot_weighed_values)
 
-    def pctPrint(pct, allvals, identifier):
+    def pctPrint(pct, allvals, identifier, is_mb):
         absolute = int(numpy.round(pct / 100.0 * numpy.sum(allvals)))
         value = int(round(pct, 0))
         
-        if math.isclose(pct, identifier, rel_tol=1e-5):
-            return '{}%\n{} MB'.format(value, absolute)
+        if math.isclose(pct, identifier, rel_tol=1e-6):
+            return '{}%\n{} MB'.format(value, absolute) if is_mb else '{}%\n{}'.format(value, absolute)
         
         else:
             return '{}%'.format(value)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 18))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 24))
     
     _, _, pcts1 = ax1.pie(
         plot_values,
         explode=explode1,
         labels=[key + ' MB' for key in plot_keys],
-        autopct=lambda pct: pctPrint(pct, plot_values, identifier1),
+        autopct=lambda pct: pctPrint(pct, plot_values, identifier1, is_mb=False),
         wedgeprops={'edgecolor': 'black'},
         textprops={'fontsize': 12, 'fontweight': 'bold'},
         startangle=90
@@ -189,7 +184,7 @@ if histogram_dict1 and histogram_dict2:
         plot_weighed_values,
         explode=explode2,
         labels=[key + ' MB' for key in plot_weighed_keys],
-        autopct=lambda pct: pctPrint(pct, plot_weighed_values, identifier2),
+        autopct=lambda pct: pctPrint(pct, plot_weighed_values, identifier2, is_mb=True),
         wedgeprops={'edgecolor': 'black'},
         textprops={'fontsize': 12, 'fontweight': 'bold'},
         startangle=180
@@ -212,9 +207,11 @@ if histogram_dict1 and histogram_dict2:
 
     plt.close(fig)
 
-    fig, ax = plt.subplots(figsize=(36, 12))
-
     x = range(len(optimized_operator_timeline))
+
+    max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
+
+    fig, ax = plt.subplots(figsize=(36, 12))
 
     ax.scatter(
         x,
@@ -231,7 +228,8 @@ if histogram_dict1 and histogram_dict2:
 
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or Last-level cache\n', fontweight='bold')
+                 '(on-chip memory) with no NPU or Last-level cache\n\nMaximum Memory Size of any Operator in the model: {} MB\n'.format(max_operator_memory),
+                 fontweight='bold')
 
     ax.set_title('Memory Size of Operators (> {} MB)'.format(threshold))
     
