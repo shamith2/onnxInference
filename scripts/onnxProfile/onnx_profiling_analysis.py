@@ -1,4 +1,4 @@
-# Script to analyze onnx model memory profiler summary
+# Script to analyse onnx model memory profiler summary
 
 import os
 import sys
@@ -36,7 +36,7 @@ try:
     threshold = int(sys.argv[2])
 
 except IndexError:
-    raise Exception("[Usage] > python onnx_profiling_analysis.py [model name] [size of on-chip memory in MB]")
+    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [size of NPU on-chip memory in MB]")
     sys.exit()
 
 # optimize operators having consecutive same output memory size
