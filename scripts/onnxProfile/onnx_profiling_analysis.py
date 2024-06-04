@@ -168,7 +168,7 @@ if histogram_dict1 and histogram_dict2:
         else:
             return '{}%'.format(value)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 24))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 12))
     
     _, _, pcts1 = ax1.pie(
         plot_values,
@@ -194,9 +194,9 @@ if histogram_dict1 and histogram_dict2:
     plt.setp(pcts2, size=14, color='white', fontweight='bold')
 
     # set title
-    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
+    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or Last-level cache\n', fontweight='bold')
+                 '(on-chip memory) with no NPU cache\n', fontsize=14, fontweight='bold')
     
     ax1.set_title('Breakdown based on Count')
     ax2.set_title('Breakdown based on Weighed Count')
@@ -211,7 +211,7 @@ if histogram_dict1 and histogram_dict2:
 
     max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
 
-    fig, ax = plt.subplots(figsize=(96, 24))
+    fig, ax = plt.subplots(figsize=(16, 12))
 
     ax.scatter(
         x,
@@ -222,14 +222,16 @@ if histogram_dict1 and histogram_dict2:
     ax.set_xticks(x)
     ax.set_xticklabels(optimized_operator_timeline)
     plt.setp(ax.get_xticklabels(), rotation=90)
+
+    ax.set_yticks(range(0, max_operator_memory + 1, 5))
     
     ax.set_xlabel('Operator')
     ax.set_ylabel('Operator Memory Size [in MB]')
 
-    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
+    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or Last-level cache\n\nMaximum Memory Size of any Operator in the model: {} MB\n\n'.format(max_operator_memory),
-                 fontweight='bold')
+                 '(on-chip memory) with no NPU cache\n\nMaximum Memory Size of any Operator in the model: {} MB\n\n'.format(max_operator_memory),
+                 fontsize=14, fontweight='bold')
 
     ax.set_title('Memory Size of Operators (> {} MB)'.format(threshold))
     
