@@ -168,7 +168,7 @@ if histogram_dict1 and histogram_dict2:
         else:
             return '{}%'.format(value)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 24))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 12))
     
     _, _, pcts1 = ax1.pie(
         plot_values,
@@ -209,22 +209,42 @@ if histogram_dict1 and histogram_dict2:
 
     x = range(len(optimized_operator_timeline))
 
+    unique_ops = list(set(optimized_operator_timeline))
+    num_unique_ops = len(unique_ops)
+
+    plot_ops = []
+
+    for i, op in enumerate(optimized_operator_timeline):
+        plot_ops.append(unique_ops.index(op))
+
     max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
 
-    fig, ax = plt.subplots(figsize=(96, 24))
+    fig, ax = plt.subplots(figsize=(18, 12))
 
-    ax.scatter(
+    scatter = ax.scatter(
         x,
-        optimized_operator_usage_timeline
+        optimized_operator_usage_timeline,
+        c=plot_ops
     )
 
     # set axes labels and title
-    ax.set_xticks(x)
-    ax.set_xticklabels(optimized_operator_timeline)
-    plt.setp(ax.get_xticklabels(), rotation=90)
+    ax.set_yticks(range(0, max_operator_memory, 5))
+
+    handles, _ = scatter.legend_elements()
+
+    legend = ax.legend(
+        handles=handles,
+        labels=unique_ops,
+        loc='best',
+        title='Operators'
+    )
+    
+    ax.add_artist(legend)
     
     ax.set_xlabel('Operator')
     ax.set_ylabel('Operator Memory Size [in MB]')
+
+    plt.tick_params(bottom=False, labelbottom=False)
 
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
