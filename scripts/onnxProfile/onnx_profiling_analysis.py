@@ -194,9 +194,9 @@ if histogram_dict1 and histogram_dict2:
     plt.setp(pcts2, size=14, color='white', fontweight='bold')
 
     # set title
-    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
+    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or Last-level cache\n', fontweight='bold')
+                 '(on-chip memory) with no NPU cache\n', fontweight='bold')
     
     ax1.set_title('Breakdown based on Count')
     ax2.set_title('Breakdown based on Weighed Count')
@@ -228,7 +228,7 @@ if histogram_dict1 and histogram_dict2:
     )
 
     # set axes labels and title
-    ax.set_yticks(range(0, max_operator_memory, 5))
+    ax.set_yticks(range(0, max_operator_memory + 1, 5))
 
     handles, _ = scatter.legend_elements()
 
@@ -244,12 +244,11 @@ if histogram_dict1 and histogram_dict2:
     ax.set_xlabel('Operator')
     ax.set_ylabel('Operator Memory Size [in MB]')
 
-    plt.tick_params(bottom=False, labelbottom=False)
+    plt.tick_params(bottom=True, labelbottom=False)
 
-    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory '.format(model_name) + 
+    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU or Last-level cache\n\nMaximum Memory Size of any Operator in the model: {} MB\n\n'.format(max_operator_memory),
-                 fontweight='bold')
+                 '(on-chip memory) with no NPU cache\n', fontweight='bold')
 
     ax.set_title('Memory Size of Operators (> {} MB)'.format(threshold))
     
