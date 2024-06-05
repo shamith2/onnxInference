@@ -228,6 +228,7 @@ if histogram_dict1 and histogram_dict2:
     )
 
     # set axes labels and title
+    ax.set_xticks(x)
     ax.set_yticks(range(0, max_operator_memory + 1, 5))
 
     handles, _ = scatter.legend_elements()
