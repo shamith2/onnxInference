@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 import numpy
 from PIL import Image
 
-from onnxInsights.stableDiffusion import SD_Turbo_MSFT_pipeline
+from onnxInsights.stableDiffusion import SD_Turbo_MSFT_pipeline, visualizeLatents
 
 
 # global variables: use with caution
@@ -33,6 +33,14 @@ def run_sd_turbo_text2img():
     SD_Turbo_MSFT_pipeline(prompt, MODEL_DIR, WEIGHTS_DIR, None, steps=4, save_directory=RESULT_DIR, output_filename = 'image', display=False)
 
 
+def run_visualize_latents():
+    prompt = "An astronaut riding a horse"
+
+    visualizeLatents(RESULT_DIR, 'SD MSFT', prompt)
+
+
 if __name__ == '__main__':
-    run_sd_turbo_text2img()
+    # run_sd_turbo_text2img()
+
+    run_visualize_latents()
 
