@@ -147,7 +147,7 @@ def runVAEEncoder(
         input: numpy.ndarray = float32[1, LATENT_CHANNELS, LATENT_SIZE, LATENT_SIZE]
 
     Outputs:
-        output: numpy.ndarray = float32[1, 3, IMG_SIZE, IMG_SIZE]
+        latents: numpy.ndarray = float32[1, 3, IMG_SIZE, IMG_SIZE]
         inference_time: int = inference time, in ms, of the model
     """
     seq_session_options = session_options._replace(dynamic_axes = {'num_channels_latent': LATENT_CHANNELS, 'height_latent': LATENT_SIZE, 'width_latent': LATENT_SIZE, 'num_channels': 3})
@@ -164,9 +164,11 @@ def runVAEEncoder(
         sustain_tensors=sustain_tensors
     )
 
+    latents = outputs[0] * VAE_ENCODER_SCALE
+
     inference_time = round(inference_time / 1e6, 2)
 
-    return outputs[0], inference_time
+    return latents, inference_time
 
 
 def runVAEDecoder(
@@ -373,7 +375,7 @@ def SD_pipeline(
     uncond_input_ids = uncond_text_input.input_ids
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(generateLatents, (1, 4, LATENT_SIZE, LATENT_SIZE), scheduler.init_noise_sigma),
+        futures = [executor.submit(generateLatents, (1, 4, LATENT_SIZE, LATENT_SIZE), scheduler.init_noise_sigma.item()),
                    executor.submit(runTextEncoder1, model_directory, cond_input_ids, seq_session_options, False),
                    executor.submit(runTextEncoder1, model_directory, uncond_input_ids, seq_session_options, False)]
         
@@ -494,8 +496,6 @@ def SD_Turbo_pipeline(
             seq_session_options,
             False
         )
-
-        latents *= VAE_ENCODER_SCALE
 
         # generate random noisy latents
         noise, _ = generateLatents(
