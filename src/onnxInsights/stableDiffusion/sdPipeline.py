@@ -295,7 +295,7 @@ def postProcess(
     latents /= VAE_DECODER_SCALE
 
     # run VAE decoder
-    vae_output, vae_inference_time = runVAEDecoder(
+    vae_output, vae_decoder_inference_time = runVAEDecoder(
         model_directory,
         latents,
         session_options,
@@ -304,7 +304,7 @@ def postProcess(
 
     saveTensorasImage(vae_output, results_dir, filename, display=display)
     
-    return vae_inference_time
+    return vae_decoder_inference_time
 
 
 def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0):
@@ -419,15 +419,19 @@ def SD_pipeline(
         _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
-        unet_inference_time += unet_inference_time
+        if i > 0:
+            unet_inference_time += unet_inference_time
 
-    unet_inference_time = unet_inference_time / len(scheduler.timesteps)
+    unet_inference_time = round(unet_inference_time / steps, 3)
 
-    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, False)
+    vae_decoder_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, False)
 
     end = time.time() - start
 
-    inference_times += (unet_inference_time, vae_inference_time, round(end * 1000, 3))
+    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
+
+    # inference times in ms
+    inference_times += (unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
 
     dumpMetadata(
         inference_times,
@@ -544,17 +548,19 @@ def SD_Turbo_pipeline(
         _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
-        unet_inference_time += unet_inference_time
+        if i > 0:
+            unet_inference_time += unet_inference_time
 
-    unet_inference_time = unet_inference_time / steps
+    unet_inference_time = round(unet_inference_time / steps, 3)
 
-    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, display)
+    vae_decoder_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, display)
 
     end = time.time() - start
 
-    print('\n----- Total Inference Time for {} steps: {} -----\n'.format(steps, end))
+    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
 
-    inference_times += (unet_inference_time, vae_inference_time, round(end * 1000, 3))
+    # inference times in ms
+    inference_times += (unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
 
     dumpMetadata(
         inference_times,
@@ -669,17 +675,19 @@ def SDXL_Turbo_pipeline(
         _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
-        unet_inference_time += unet_inference_time
+        if i > 0:
+            unet_inference_time += unet_inference_time
 
-    unet_inference_time = unet_inference_time / steps
+    unet_inference_time = round(unet_inference_time / steps, 3)
 
-    vae_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, display)
+    vae_decoder_inference_time = postProcess(model_directory, latents, seq_session_options, os.path.join(save_directory, 'images'), output_filename, False, display)
 
     end = time.time() - start
 
-    print('\n----- Total Inference Time for {} steps: {} -----\n'.format(steps, end))
+    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
 
-    inference_times += (unet_inference_time, vae_inference_time, round(end * 1000, 3))
+    # inference times in ms
+    inference_times += (unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
 
     dumpMetadata(
         inference_times,
