@@ -94,7 +94,7 @@ def runTextEncoder1(
         sustain_tensors=sustain_tensors
     )
 
-    inference_time = round(inference_time / 1e6, 2)
+    inference_time = round(inference_time / 1e6, 3)
 
     return outputs, inference_time
 
@@ -129,7 +129,7 @@ def runTextEncoder2(
         sustain_tensors=sustain_tensors
     )
 
-    inference_time = round(inference_time / 1e6, 2)
+    inference_time = round(inference_time / 1e6, 3)
 
     return outputs, inference_time
 
@@ -166,7 +166,7 @@ def runVAEEncoder(
 
     latents = outputs[0] * VAE_ENCODER_SCALE
 
-    inference_time = round(inference_time / 1e6, 2)
+    inference_time = round(inference_time / 1e6, 3)
 
     return latents, inference_time
 
@@ -201,7 +201,7 @@ def runVAEDecoder(
         sustain_tensors=sustain_tensors
     )
 
-    inference_time = round(inference_time / 1e6, 2)
+    inference_time = round(inference_time / 1e6, 3)
 
     return outputs[0], inference_time
 
@@ -238,7 +238,7 @@ def runUNet(
         sustain_tensors=sustain_tensors
     )
 
-    inference_time = round(inference_time / 1e6, 2)
+    inference_time = round(inference_time / 1e6, 3)
 
     return outputs[0], inference_time
 
@@ -277,7 +277,7 @@ def runUNetXL(
         sustain_tensors=sustain_tensors
     )
 
-    inference_time = round(inference_time / 1e6, 2)
+    inference_time = round(inference_time / 1e6, 3)
 
     return outputs[0], inference_time
 
