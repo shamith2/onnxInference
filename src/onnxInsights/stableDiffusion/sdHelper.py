@@ -235,7 +235,8 @@ def saveTensorasImage(
         tensor: numpy.ndarray,
         result_dir: str,
         filename: str = 'sd',
-        display: bool = False
+        display: bool = False,
+        normalize: bool = True
 ) -> int:
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
@@ -245,7 +246,8 @@ def saveTensorasImage(
 
     c1, c2, c3 = tensor.shape
 
-    tensor = numpy.clip((tensor / 2) + 0.5, a_min=0, a_max=1)
+    if normalize:
+        tensor = numpy.clip((tensor / 2) + 0.5, a_min=0, a_max=1)
     
     if c1 == 3 and (c2 > c1 and c3 > c1):
         tensor = numpy.transpose(tensor, (1, 2, 0))
