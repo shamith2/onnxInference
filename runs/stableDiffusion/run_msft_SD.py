@@ -30,7 +30,7 @@ RESULT_DIR = os.path.join(ROOT, 'results', 'stableDiffusion', 'sd_msft_results')
 def run_sd_turbo_text2img():
     prompt = "An astronaut riding a horse"
     
-    SD_Turbo_MSFT_pipeline(prompt, MODEL_DIR, WEIGHTS_DIR, None, steps=4, save_directory=RESULT_DIR, output_filename = 'image', display=True)
+    SD_Turbo_MSFT_pipeline(prompt, MODEL_DIR, WEIGHTS_DIR, None, steps=4, save_directory=RESULT_DIR, output_filename = 'image', display=False)
 
 
 if __name__ == '__main__':
