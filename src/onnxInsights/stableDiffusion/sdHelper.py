@@ -83,6 +83,8 @@ def dumpMetadata(
         inference_times: tuple[float],
         latent_norm_list: tuple[float],
         result_dir: str,
+        inference_time_header: str = "UNet,VAE Decoder,Total",
+        latent_norm_header: str = "Step,Latents Norm",
         filename: str = 'sd_pipeline'
 ) -> int:
     """
@@ -100,10 +102,10 @@ def dumpMetadata(
 
     if not os.path.exists(os.path.join(result_dir, inf_time_filename)):
         with open(os.path.join(result_dir, inf_time_filename), 'w') as f:
-            f.write('UNet,VAE Decoder,Total\n')
+            f.write(inference_time_header + '\n')
     
     with open(os.path.join(result_dir, latent_norm_filename), 'w') as f:
-        f.write('Step,Latents Norm\n')
+        f.write(latent_norm_header + '\n')
     
     with open(os.path.join(result_dir, inf_time_filename), 'a') as f:
         for i, inference_time in enumerate(inference_times):

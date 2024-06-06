@@ -427,9 +427,15 @@ def SD_pipeline(
 
     end = time.time() - start
 
-    inference_times += (unet_inference_time, vae_inference_time, end * 1000)
+    inference_times += (unet_inference_time, vae_inference_time, round(end * 1000, 3))
 
-    dumpMetadata(inference_times, latent_norm_list, os.path.join(save_directory, 'logs'), 'sd_pipeline')
+    dumpMetadata(
+        inference_times,
+        latent_norm_list,
+        os.path.join(save_directory, 'logs'),
+        "UNet,VAE Decoder,Total",
+        filename='sd_pipeline'
+    )
 
     return 0
 
@@ -548,9 +554,15 @@ def SD_Turbo_pipeline(
 
     print('\n----- Total Inference Time for {} steps: {} -----\n'.format(steps, end))
 
-    inference_times += (unet_inference_time, vae_inference_time, end * 1000)
+    inference_times += (unet_inference_time, vae_inference_time, round(end * 1000, 3))
 
-    dumpMetadata(inference_times, latent_norm_list, os.path.join(save_directory, 'logs'), 'sd_pipeline')
+    dumpMetadata(
+        inference_times,
+        latent_norm_list,
+        os.path.join(save_directory, 'logs'),
+        "UNet,VAE Decoder,Total",
+        filename='sd_pipeline'
+    )
 
     return 0
 
@@ -667,9 +679,15 @@ def SDXL_Turbo_pipeline(
 
     print('\n----- Total Inference Time for {} steps: {} -----\n'.format(steps, end))
 
-    inference_times += (unet_inference_time, vae_inference_time, end * 1000)
+    inference_times += (unet_inference_time, vae_inference_time, round(end * 1000, 3))
 
-    dumpMetadata(inference_times, latent_norm_list, os.path.join(save_directory, 'logs'), 'sd_pipeline')
+    dumpMetadata(
+        inference_times,
+        latent_norm_list,
+        os.path.join(save_directory, 'logs'),
+        "UNet,VAE Decoder,Total",
+        filename='sd_pipeline'
+    )
 
     return 0
 
