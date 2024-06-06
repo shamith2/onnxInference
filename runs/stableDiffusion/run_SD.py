@@ -2,14 +2,13 @@
 
 import os
 from pathlib import Path
-import pytest
 
 from tqdm.auto import tqdm
 
 import numpy
 from PIL import Image
 
-from onnxInsights.stableDiffusion import SD_pipeline, SD_Turbo_pipeline, SDXL_Turbo_pipeline
+from onnxInsights.stableDiffusion import SD_Turbo_pipeline, SDXL_Turbo_pipeline
 from onnxInsights.stableDiffusion import getFramesfromVideo, createVideofromFrames, visualizeLatents
 
 

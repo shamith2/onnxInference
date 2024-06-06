@@ -18,8 +18,8 @@ import onnxruntime
 from transformers import CLIPTokenizerFast
 from diffusers import EulerAncestralDiscreteScheduler
 
-from onnxInsights.onnxHelpers import ORTSessionOptions, init_Inference, Inference
-from onnxInsights.stableDiffusion import changeDtype, siLU, dumpMetadata, getTensorfromImage, saveTensorasImage
+from ..onnxHelpers import ORTSessionOptions, init_Inference, Inference
+from .sdHelper import changeDtype, siLU, dumpMetadata, getTensorfromImage, saveTensorasImage
 
 import logging
 
@@ -34,10 +34,7 @@ __version__ = "0.1.0"
 ROOT = Path(__file__).parents[3].resolve()
 WORKSPACE = Path(__file__).parent.resolve()
 
-MODEL_DIR = os.path.join(ROOT, 'weights', 'stableDiffusion', 'sd_msft_onnx')
-
-WEIGHTS_DIR = os.path.join(ROOT, 'weights', 'stableDiffusion')
-CACHE_DIR = os.path.join(WEIGHTS_DIR, '.cache')
+CACHE_DIR = os.path.join(ROOT, 'weights', 'stableDiffusion', '.cache')
 
 SD_T_RESULT_DIR = os.path.join(ROOT, 'results', 'stableDiffusion', 'sd_msft_results')
 
@@ -47,7 +44,6 @@ LATENT_CHANNELS = 4
 TIME_EMBEDDING_SIZE = 320
 VAE_DECODER_SCALE = 0.18215
 VAE_ENCODER_SCALE = 0.18215
-GUIDANCE_SCALE = 7.0
 
 
 def generateLatents(
@@ -302,10 +298,10 @@ def postProcess(
     return vae_decoder_inference_time
 
 
-def SD_Turbo_pipeline(
-        prompt: str = 'astronaut riding a horse',
-        model_directory: str = MODEL_DIR,
-        weights_directory: str = WEIGHTS_DIR,
+def SD_Turbo_MSFT_pipeline(
+        prompt: str,
+        model_directory: str,
+        weights_directory: str,
         image: Optional[numpy.ndarray] = None,
         steps: int = 4,
         cache_directory: Optional[str] = CACHE_DIR,
@@ -440,9 +436,4 @@ def SD_Turbo_pipeline(
     )
 
     return 0
-
-
-# for testing
-if __name__ == '__main__':
-    SD_Turbo_pipeline()
 
