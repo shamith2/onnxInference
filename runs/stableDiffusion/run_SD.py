@@ -31,7 +31,7 @@ SD_XL_TURBO_RESULT_DIR = os.path.join(ROOT, 'results', 'stableDiffusion', 'sdxl_
 def run_sd_turbo_text2img():
     prompt = "A cinematic shot of a baby racoon wearing an intricate italian priest robe"
     
-    SD_Turbo_pipeline(prompt, SD_TURBO_MODEL_DIR, None, steps=1, save_directory=SD_TURBO_RESULT_DIR, output_filename = 'image', display=True)
+    SD_Turbo_pipeline(prompt, SD_TURBO_MODEL_DIR, None, steps=4, save_directory=SD_TURBO_RESULT_DIR, output_filename = 'image', display=True)
 
 
 def run_sd_turbo_img2img():
