@@ -330,7 +330,8 @@ def SD_pipeline(
         steps: int = 10,
         cache_directory: Optional[str] = CACHE_DIR,
         save_directory: Optional[str] = SD_RESULT_DIR,
-        output_filename: Optional[str] = 'sd_final_output'
+        output_filename: Optional[str] = 'sd_final_output',
+        save_intermediate_latents: bool = True
 ) -> int:
     """
     Stable Diffusion v2 onnxruntime pipeline
@@ -411,12 +412,13 @@ def SD_pipeline(
 
         latents = scheduler.step(torch.from_numpy(noisy_output), t, torch.from_numpy(latents)).prev_sample.detach().numpy()
 
-        # just to view intermediate latents
-        int_latents = copy.deepcopy(latents)
+        if save_intermediate_latents:
+            # just to view intermediate latents
+            int_latents = copy.deepcopy(latents)
 
-        latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
+            latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
 
-        _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
+            _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
         if i > 0:
@@ -452,6 +454,7 @@ def SD_Turbo_pipeline(
         cache_directory: Optional[str] = CACHE_DIR,
         save_directory: Optional[str] = SD_T_RESULT_DIR,
         output_filename: Optional[str] = 'sd_final_output',
+        save_intermediate_latents: bool = True,
         display: bool = False
 ) -> int:
     """
@@ -540,12 +543,13 @@ def SD_Turbo_pipeline(
 
         latents = scheduler.step(torch.from_numpy(unet_output), t, torch.from_numpy(latents)).prev_sample.detach().numpy()
 
-        # just to view intermediate latents
-        int_latents = copy.deepcopy(latents)
+        if save_intermediate_latents:
+            # just to view intermediate latents
+            int_latents = copy.deepcopy(latents)
 
-        latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
+            latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
 
-        _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
+            _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
         if i > 0:
@@ -580,6 +584,7 @@ def SDXL_Turbo_pipeline(
         cache_directory: Optional[str] = CACHE_DIR,
         save_directory: Optional[str] = SD_XL_RESULT_DIR,
         output_filename: Optional[str] = 'sd_final_output',
+        save_intermediate_latents: bool = True,
         display: bool = False
 ) -> int:
     """
@@ -667,12 +672,13 @@ def SDXL_Turbo_pipeline(
 
         latents = scheduler.step(torch.from_numpy(unet_output), t, torch.from_numpy(latents)).prev_sample.detach().numpy()
 
-        # just to view intermediate latents
-        int_latents = copy.deepcopy(latents)
+        if save_intermediate_latents:
+            # just to view intermediate latents
+            int_latents = copy.deepcopy(latents)
 
-        latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
+            latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
 
-        _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
+            _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
         if i > 0:

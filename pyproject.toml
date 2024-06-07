@@ -27,7 +27,6 @@ dependencies = [
     "cmake",
     "onnx",
     "numpy",
-    "onnxruntime-directml",
     "torch",
     "torch-directml",
     "optimum",

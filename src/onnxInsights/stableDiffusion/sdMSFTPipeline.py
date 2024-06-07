@@ -18,7 +18,7 @@ import onnxruntime
 from transformers import CLIPTokenizerFast
 from diffusers import EulerAncestralDiscreteScheduler
 
-from ..onnxHelpers import ORTSessionOptions, init_Inference, Inference
+from ..onnxHelpers import ORTSessionOptions, ORTNPUOptions, init_Inference, Inference
 from .sdHelper import changeDtype, siLU, dumpMetadata, getTensorfromImage, saveTensorasImage
 
 import logging
@@ -143,14 +143,19 @@ def runTextEncoder(
         output: numpy.ndarray = float32[1, 77, 1024]
         inference_time: int = inference time, in ms, of the model
     """
+    psq1_npu_options = ORTNPUOptions('psq1', 1, '4x4', None, None)
+    psq2_npu_options = ORTNPUOptions('psq2', 1, '4x4', None, None)
+    
     psq1_ort_session = init_Inference(
         os.path.join(model_directory, 'text_encoder', 'model.onnx'),
-        session_options=session_options
+        session_options=session_options,
+        npu_options=psq1_npu_options if session_options.execution_provider == 'NPU' else None
     )
 
     psq2_ort_session = init_Inference(
         os.path.join(model_directory, 'text_encoder_2', 'model.onnx'),
-        session_options=session_options
+        session_options=session_options,
+        npu_options=psq2_npu_options if session_options.execution_provider == 'NPU' else None
     )
     
     psq1_outputs, psq1_inference_time = Inference(
@@ -186,9 +191,12 @@ def runVAEEncoder(
         latents: numpy.ndarray = float32[1, 3, IMG_SIZE, IMG_SIZE]
         inference_time: int = inference time, in ms, of the model
     """
+    vae_encoder_npu_options = ORTNPUOptions('vae_encoder', 1, '4x4', None, None)
+
     ort_session = init_Inference(
         os.path.join(model_directory, 'vae_encoder', 'model.onnx'),
-        session_options=session_options
+        session_options=session_options,
+        npu_options=vae_encoder_npu_options if session_options.execution_provider == 'NPU' else None
     )
 
     outputs, inference_time = Inference(
@@ -221,9 +229,12 @@ def runVAEDecoder(
         output: numpy.ndarray = float32[1, 3, IMG_SIZE, IMG_SIZE]
         inference_time: int = inference time, in ms, of the model
     """
+    vae_decoder_npu_options = ORTNPUOptions('vae_decoder', 1, '4x4', None, None)
+
     ort_session = init_Inference(
         os.path.join(model_directory, 'vae_decoder', 'model.onnx'),
-        session_options=session_options
+        session_options=session_options,
+        npu_options=vae_decoder_npu_options if session_options.execution_provider == 'NPU' else None
     )
 
     outputs, inference_time = Inference(
@@ -256,9 +267,12 @@ def runUNet(
         output: numpy.ndarray = float32[1, LATENT_CHANNELS, LATENT_SIZE, LATENT_SIZE]
         inference_time: float = inference time, in ms, of the model
     """
+    unet_npu_options = ORTNPUOptions('unet', 1, '4x4', None, None)
+
     ort_session = init_Inference(
         os.path.join(model_directory, 'unet', 'model.onnx'),
-        session_options=session_options
+        session_options=session_options,
+        npu_options=unet_npu_options if session_options.execution_provider == 'NPU' else None
     )
 
     outputs, inference_time = Inference(
@@ -307,6 +321,7 @@ def SD_Turbo_MSFT_pipeline(
         cache_directory: Optional[str] = CACHE_DIR,
         save_directory: Optional[str] = SD_T_RESULT_DIR,
         output_filename: Optional[str] = 'sd_final_output',
+        save_intermediate_latents: bool = True,
         display: bool = False
 ) -> int:
     """
@@ -315,6 +330,10 @@ def SD_Turbo_MSFT_pipeline(
     seq_session_options = ORTSessionOptions('CPU', 'cpu', {}, 2, 0, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
                                             onnxruntime.ExecutionMode.ORT_SEQUENTIAL,
                                             onnxruntime.ExecutionOrder.DEFAULT, 3)
+    
+    acc_seq_session_options = ORTSessionOptions('NPU', 'cpu', {}, 2, 0, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
+                                                onnxruntime.ExecutionMode.ORT_SEQUENTIAL,
+                                                onnxruntime.ExecutionOrder.DEFAULT, 3)
     
     prl_session_options = ORTSessionOptions('CPU', 'cpu', {}, 2, 1, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
                                             onnxruntime.ExecutionMode.ORT_PARALLEL,
@@ -405,12 +424,13 @@ def SD_Turbo_MSFT_pipeline(
 
         latents = scheduler.step(torch.from_numpy(unet_output), t, torch.from_numpy(latents)).prev_sample.detach().numpy()
 
-        # just to view intermediate latents
-        int_latents = copy.deepcopy(latents)
+        if save_intermediate_latents:
+            # just to view intermediate latents
+            int_latents = copy.deepcopy(latents)
 
-        latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
+            latent_norm_list.append((t.item(), numpy.linalg.norm(numpy.reshape(int_latents, (int_latents.shape[0], -1)), axis=1).mean()))
 
-        _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
+            _ = postProcess(model_directory, int_latents, seq_session_options, os.path.join(save_directory, 'latents'), 'sd_int_' + str(t.item()), False, False)
 
         # average inference time for unet model for conditional input
         if i > 0:

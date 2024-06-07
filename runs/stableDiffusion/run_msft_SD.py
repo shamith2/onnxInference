@@ -40,7 +40,7 @@ def run_visualize_latents():
 
 
 if __name__ == '__main__':
-    # run_sd_turbo_text2img()
+    run_sd_turbo_text2img()
 
-    run_visualize_latents()
+    # run_visualize_latents()
 

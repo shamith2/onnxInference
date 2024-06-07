@@ -73,18 +73,19 @@ def init_NPU_Inference(
     config_file_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], 'voe-win_amd64-latest')
     xclbin_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], 'voe-win_amd64-latest')
 
-    working_dir = Path(__file__).parent.resolve()
-    config_file_path = os.path.join(config_file_dir, 'vaip_config.json') if npu_options.config_file_path is None else npu_options.config_file_path
-    cache_dir = os.path.join(working_dir.parent.parent, '.cache')
-    cache_key = npu_options.model_name + '_ryzen_ai_' + config_file_path.split('\\')[-1][:-5] + '_' + npu_options.layout
+    root = Path(__file__).parents[3].resolve()
+
+    config_file_path = os.path.join(config_file_dir, 'vaip_config_' + npu_options.layout + '.json') if npu_options.config_file_path is None else npu_options.config_file_path
+    cache_dir = os.path.join(root, '.cache')
+    cache_key = npu_options.model_name.lower() + '_ryzen_ai_' + config_file_path.split('\\')[-1][:-5]
 
     if npu_options.layout == '1x4':
         os.environ['XLNX_VART_FIRMWARE'] = os.path.join(xclbin_dir, 'AMD_AIE2P_Nx4_Overlay.xclbin') if npu_options.xclbin_path is None else npu_options.xclbin_path
-        os.environ['NUM_OF_DPU_RUNNERS'] = str(min(npu_options.instance_count, 8))
+        os.environ['NUM_OF_DPU_RUNNERS'] = str(min(int(npu_options.instance_count), 8))
 
     elif npu_options.layout == '4x4':
         os.environ['XLNX_VART_FIRMWARE'] = os.path.join(xclbin_dir, 'AMD_AIE2P_4x4_Overlay.xclbin') if npu_options.xclbin_path is None else npu_options.xclbin_path
-        os.environ['NUM_OF_DPU_RUNNERS'] = str(min(npu_options.instance_count, 2))
+        os.environ['NUM_OF_DPU_RUNNERS'] = str(min(int(npu_options.instance_count), 2))
 
     else:
         raise Exception("Invalid Layout parameter: should be 1x4 or 4x4")
@@ -125,7 +126,7 @@ def init_Inference(
     sess_options = onnxruntime.SessionOptions()
 
     sess_options.log_severity_level = session_options.log_severity_level
-    sess_options.log_verbosity_level = 0
+    sess_options.log_verbosity_level = session_options.log_severity_level
 
     sess_options.enable_cpu_mem_arena = True
     sess_options.enable_mem_pattern = True
