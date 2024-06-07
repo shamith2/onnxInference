@@ -17,7 +17,7 @@ from transformers import CLIPTokenizerFast
 from diffusers import EulerAncestralDiscreteScheduler
 
 from ..onnxHelpers import ORTSessionOptions, init_Inference, Inference
-from .sdHelper import changeDtype, dumpMetadata, saveTensorasImage
+from ..onnxHelpers import changeDtype, dumpMetadata, saveTensorasImage
 
 import logging
 

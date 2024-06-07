@@ -2,3 +2,5 @@
 from .onnxInference import ORTSessionOptions, ORTNPUOptions, init_Inference, Inference
 from .onnxBenchmark import ONNXInference
 from .onnxTransformer import ONNXTransformer
+from .inferenceHelper import changeDtype, siLU, captureScreenshot, dumpMetadata, saveTensorasImage, getTensorfromImage, getFramesfromVideo, createVideofromFrames, visualizeLatents
+from .inferenceHelper import hdTransform

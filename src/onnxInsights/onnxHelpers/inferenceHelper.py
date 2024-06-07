@@ -1,10 +1,12 @@
-# Helper functions for Python Stable Diffusion ONNXRuntime Pipelines
+# Helper functions for Python ONNXRuntime Inference Pipelines
 
 import os
 import numpy
 import random
 
-from PIL import Image
+import torch
+
+from PIL import Image, ImageOps
 from matplotlib import pyplot as plt
 
 import cv2
@@ -17,7 +19,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-__producer__ = "sdHelper"
+__producer__ = "inferenceHelper"
 __version__ = "0.1.0"
 
 
@@ -117,9 +119,10 @@ def dumpMetadata(
 
         f.write('\n')
     
-    for t, latents_norm in latent_norm_list:
-        with open(os.path.join(result_dir, latent_norm_filename), 'a') as f:
-            f.write("Step: {} Latenct Norm: {}\n".format(t, latents_norm))
+    if latent_norm_list:
+        for t, latents_norm in latent_norm_list:
+            with open(os.path.join(result_dir, latent_norm_filename), 'a') as f:
+                f.write("Step: {} Latenct Norm: {}\n".format(t, latents_norm))
     
     return 0
 
@@ -131,11 +134,13 @@ def siLU(
 
 
 def preProcessTensor(
-    image: numpy.ndarray
+    image: numpy.ndarray,
+    preprocess: bool = True
 ) -> numpy.ndarray:
     tensor = changeDtype(image / 255.0, "tensor(float)")
 
-    tensor = tensor * 2.0 - 1
+    if preprocess:
+        tensor = tensor * 2.0 - 1
 
     c1, c2, c3 = tensor.shape
 
@@ -149,16 +154,93 @@ def preProcessTensor(
 
 def getTensorfromImage(
         image_path: str,
-        image_size: int
+        image_size: int = None,
+        preprocess: bool = True
 ) -> numpy.ndarray:
     image = Image.open(image_path)
 
     image = image.convert('RGB')
 
-    image = image.resize((image_size, image_size))
+    if image_size:
+        image = image.resize((image_size, image_size))
 
-    tensor = preProcessTensor(numpy.array(image))
+    tensor = preProcessTensor(numpy.array(image), preprocess=preprocess)
 
+    return tensor
+
+
+def hdTransform(
+        image_path: str,
+        max_num_crops: int,
+        image_size: int
+) -> tuple[numpy.ndarray, numpy.ndarray, int]:
+    img = Image.open(image_path)
+
+    image_mean = numpy.array([0.48145466, 0.4578275, 0.40821073])
+    image_std = numpy.array([0.26862954, 0.26130258, 0.27577711])
+
+    img = img.convert('RGB')
+    w, h = img.size
+
+    trans = False
+    
+    if w < h:
+        img = img.transpose(Image.TRANSPOSE)
+        trans = True
+        w, h = img.size
+    
+    scale = int(numpy.sqrt(max_num_crops * w / h))
+    img = img.resize([int(scale * image_size), int(scale * image_size * h / w)], Image.BILINEAR)
+    
+    def _pad(b):
+        _, h = b.size
+        diff_height = int(numpy.ceil(h / image_size) * image_size) - h
+        top_padding = int(diff_height / 2)
+        bottom_padding = diff_height - top_padding
+        
+        b = ImageOps.expand(b, border=(0, top_padding, 0, bottom_padding), fill=(255, 255, 255))
+        
+        return b
+    
+    img = _pad(img)
+    img = img.transpose(Image.TRANSPOSE) if trans else img
+
+    img = ((numpy.array(img) / 255.0 - image_mean) / image_std).transpose(2, 0, 1)
+
+    h, w = img.shape[1], img.shape[2]
+    shapes = numpy.array([[h, w]], dtype=numpy.int64)
+
+    num_img_tokens = int((h // image_size * w // image_size + 1) * 144 + 1 + (h // image_size + 1) * 12)
+    
+    global_image = torch.nn.functional.interpolate(torch.from_numpy(img[None]), size=(image_size, image_size), mode='bicubic').clamp(min=0, max=255).numpy()
+    
+    hd_image = numpy.reshape(img, (1, 3, h // image_size, image_size, w // image_size, image_size))
+
+    hd_image = numpy.transpose(hd_image, (0, 2, 4, 1, 3, 5)).reshape(-1, 3, image_size, image_size)
+
+    hd_image = numpy.concatenate([global_image, hd_image], axis=0)
+
+    hd_image = _reshape_to_max_num_crops_tensor(hd_image, max_num_crops)
+    
+    return hd_image, shapes, num_img_tokens
+
+
+def _reshape_to_max_num_crops_tensor(
+        tensor: numpy.ndarray,
+        max_crops: int
+) -> numpy.ndarray:
+    """
+    tensor: (bsz, num_channels, height, width) where B <= max_crops -> (batch_size, max_crops, 3, height, width)
+    """
+    bsz, num_channels, height, width = tensor.shape
+    
+    if bsz < max_crops:
+        pad = numpy.zeros((max_crops - bsz, num_channels, height, width))
+        
+        tensor = numpy.concatenate((tensor, pad), axis=0)
+    
+        tensor = numpy.expand_dims(tensor, axis=0)
+    
     return tensor
 
 

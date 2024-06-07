@@ -9,7 +9,7 @@ import numpy
 from PIL import Image
 
 from onnxInsights.stableDiffusion import SD_Turbo_pipeline, SDXL_Turbo_pipeline
-from onnxInsights.stableDiffusion import getFramesfromVideo, createVideofromFrames, visualizeLatents
+from onnxInsights.onnxHelpers import getFramesfromVideo, createVideofromFrames, visualizeLatents
 
 
 # global variables: use with caution

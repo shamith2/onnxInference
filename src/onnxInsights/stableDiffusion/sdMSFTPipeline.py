@@ -4,7 +4,6 @@
 import copy
 import os
 import time
-import concurrent.futures
 from pathlib import Path
 
 from typing import Optional
@@ -19,7 +18,7 @@ from transformers import CLIPTokenizerFast
 from diffusers import EulerAncestralDiscreteScheduler
 
 from ..onnxHelpers import ORTSessionOptions, ORTNPUOptions, init_Inference, Inference
-from .sdHelper import changeDtype, siLU, dumpMetadata, getTensorfromImage, saveTensorasImage
+from ..onnxHelpers import changeDtype, siLU, dumpMetadata, getTensorfromImage, saveTensorasImage
 
 import logging
 
