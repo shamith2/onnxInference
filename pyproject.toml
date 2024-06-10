@@ -38,9 +38,7 @@ dependencies = [
     "pandas",
     "psutil",
     "opencv-python",
-    "pyautogui",
-    "imagehash",
-    "keyboard"
+    "pyautogui"
 ]
 
 [tool.hatch.version]

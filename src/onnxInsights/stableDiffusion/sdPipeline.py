@@ -430,7 +430,7 @@ def SD_pipeline(
 
     end = time.time() - start
 
-    logging.info('----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
+    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
 
     # inference times in ms
     inference_times += (unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
@@ -561,7 +561,7 @@ def SD_Turbo_pipeline(
 
     end = time.time() - start
 
-    logging.info('----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
+    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
 
     # inference times in ms
     inference_times += (unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
@@ -690,7 +690,7 @@ def SDXL_Turbo_pipeline(
 
     end = time.time() - start
 
-    logging.info('----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
+    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
 
     # inference times in ms
     inference_times += (unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
