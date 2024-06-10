@@ -5,7 +5,11 @@ Getting to know more about onnx models: insights into their performance and bott
 - onnxHelpers/onnxTransformer.py = script to modify operators in onnx models
 
 ### Custom AI Recall Pipeline:
- * Implement custom AI Recall feature, similar to Microsoft Windows AI Recall feature, running locally with Phi-3 Vision model for describing/analysing screenshots and Phi-3 Mini model to rename the screenshots based on    the image description geneated by the vision model. The filenames and descriptions (after chunking) are stored in a simple database for Retrieval-Augmented Generation (RAG). Based on a query, given by the user, the      descriptions, along with the associated filenames of the screenshots, that are similar to the query are retrieved. The Phi-3 models are currently running on the CPU (results stored at results/aiRecall/snapshots;         screenshots are not diverse)
+ * Implemented custom AI Recall feature, similar to Microsoft Windows AI Recall feature, running locally with Phi-3 Vision model for describing/analysing screenshots and Phi-3 Mini model to rename the screenshots        based on the image description geneated by the vision model.
+ 
+ * The filenames and descriptions (after chunking) are stored in a simple database for Retrieval-Augmented Generation (RAG). Based on a query, given by the user, the descriptions, along with the associated               filenames of the screenshots, that are similar to the query are retrieved. The Phi-3 models are currently running on the CPU (results stored at results/aiRecall/snapshots; screenshots are not diverse)
+
+ * Example Run:
    
    ![ai_recall_1](https://github.com/shamith2/onnxInsights/assets/43729418/7c074578-29e8-4389-b0c1-0d81a7d7f66e)
 
