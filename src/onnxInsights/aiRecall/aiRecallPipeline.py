@@ -595,7 +595,7 @@ def AI_Recall_pipeline(
 
         end = time.time() - start
 
-        logging.info('----- Top {} Search Results: -----\n'.format(top_p))
+        logging.info('----- Top {} Search Results for Query "{}": -----\n'.format(top_p, query))
 
         for filename, score in top_p_results:
             logging.info('{}: {}\n'.format(filename, score))
