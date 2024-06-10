@@ -3,6 +3,7 @@
 import os
 import numpy
 import random
+from datetime import datetime
 
 import torch
 
@@ -13,6 +14,8 @@ import cv2
 import pyautogui
 
 from typing import Optional
+
+import imagehash
 
 import logging
 
@@ -57,28 +60,107 @@ def changeDtype(
 
 
 def captureScreenshot(
-        width: int,
-        height: int
-) -> numpy.ndarray:
+) -> Image:
     """
     Capture Screenshot
 
     inputs:
-        width: unsigned int = width of the screenshot
-        height: unsigned int = height of the screenshot
+        None
 
     outputs:
-        screenshot: numpy.ndarray = screenshot image, as numpy array, of shape (width, height, 3)
+        return 0 if Success
     """
-    screenshot = pyautogui.screenshot()
+    image = pyautogui.screenshot()
 
-    screenshot = screenshot.resize(size=(width, height))
+    return image
 
-    screenshot = changeDtype(screenshot, "tensor(float)")
+
+def saveScreenshot(
+        image: Image,
+        save_directory: str
+) -> int:
+    """
+    Save Screenshot
+
+    inputs:
+        filename: str = save the screenshot as
+        save_directory: str = save the screenshot as in
+
+    outputs:
+        return screenshot if Success
+    """
+    date, time = datetime.now().strftime("%Y%m%d %H%M%S").split(' ')
+
+    screenshot_directory = os.path.join(save_directory, date)
+
+    if not os.path.exists(screenshot_directory):
+        os.makedirs(screenshot_directory)
+
+    filename = os.path.join(screenshot_directory, time + '.png')
+
+    image.save(filename)
+
+    return 0
+
+
+def compareScreenshots(
+        screenshot1: Image,
+        screenshot2: Image,
+        hamming_limit: int
+) -> bool:
+    """
+    outputs:
+        return True if screenshots are similar else False
+    """
+    hash1 = imagehash.phash(screenshot1)
+    hash2 = imagehash.phash(screenshot2)
+
+    hamming_distance = hash2 - hash1
+
+    if hamming_distance <= hamming_limit:
+        return True
     
-    screenshot = screenshot / 255.0
+    else:
+        print('hamming distance: ' + str(hamming_distance))
+        return False
 
-    return screenshot
+
+def embeddingCosineSimilarity(embedding1, embedding2):
+    normalized_embedding1 = numpy.linalg.norm(embedding1)
+    normalized_embedding2 = numpy.linalg.norm(embedding1)
+
+    if normalized_embedding1 == 0 or normalized_embedding2 == 0:
+        return 0
+    
+    else:
+        return numpy.dot(embedding1, embedding2) / (normalized_embedding1 * normalized_embedding2)
+
+
+def sample_top_p(probs, p):
+    """
+    Perform top-p (nucleus) sampling on a probability distribution.
+
+    Args:
+        probs (torch.Tensor): Probability distribution tensor.
+        p (float): Probability threshold for top-p sampling.
+
+    Returns:
+        torch.Tensor: Sampled token indices.
+
+    Note:
+        Top-p sampling selects the smallest set of tokens whose cumulative probability mass
+        exceeds the threshold p. The distribution is renormalized based on the selected tokens.
+
+    """
+    probs_sort, probs_idx = torch.sort(probs, dim=-1, descending=True)
+    probs_sum = torch.cumsum(probs_sort, dim=-1)
+    mask = probs_sum - probs_sort > p
+    probs_sort[mask] = 0.0
+    probs_sort.div_(probs_sort.sum(dim=-1, keepdim=True))
+    next_token = torch.multinomial(probs_sort, num_samples=1)
+    next_token = torch.gather(probs_idx, -1, next_token)
+    
+    return next_token
 
 
 def dumpMetadata(
@@ -131,6 +213,12 @@ def siLU(
         inputTensor: numpy.ndarray
 ) -> numpy.ndarray:
     return inputTensor / (1 + numpy.exp(-inputTensor))
+
+
+def softmax(
+        inputTensor: numpy.ndarray
+) -> numpy.ndarray:
+    return numpy.exp(inputTensor) / numpy.exp(inputTensor).sum()
 
 
 def preProcessTensor(
@@ -346,7 +434,6 @@ def saveTensorasImage(
     return 0
 
 
-# Adapted from https://www.kaggle.com/code/deveshsurve/step-by-step-guide-to-implement-latent-diffusion?scriptVersionId=172213199&cellId=22
 def visualizeLatents(
         workspace: str,
         title: str,
