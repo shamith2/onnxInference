@@ -7,7 +7,7 @@ Getting to know more about onnx models: insights into their performance and bott
 ### Custom AI Recall Pipeline:
  * Implemented custom AI Recall feature, similar to Microsoft Windows AI Recall feature, running locally with Phi-3 Vision model for describing/analysing screenshots and Phi-3 Mini model to rename the screenshots        based on the image description geneated by the vision model.
  
- * The filenames and descriptions (after chunking) are stored in a simple database for Retrieval-Augmented Generation (RAG). Based on a query, given by the user, the descriptions, along with the associated               filenames of the screenshots, that are similar to the query are retrieved. The Phi-3 models are currently running on the CPU (test screenshots and database saved in results/aiRecall/snapshots; these screenshots are not very diverse)
+ * The filenames and descriptions (after chunking) are stored in a simple database for Retrieval-Augmented Generation (RAG). Based on a query, given by the user, the descriptions, along with the associated               filenames of the screenshots, that are similar to the query are retrieved. The Phi-3 models are currently running on the CPU
 
  * Example Run:
    
@@ -17,7 +17,7 @@ Getting to know more about onnx models: insights into their performance and bott
    
    ![best_result](https://github.com/shamith2/onnxInsights/blob/1f1b3a81d6dfbbd2cab0321e70bbaf3f10790970/results/aiRecall/snapshots/20240610/YouTube_Keynote_CopilotPC_SatyaNadella_Subscribe_6102024_164832.png)
 
- * Once, the descriptions are added into the database, subsequent retrivals are quick
+ * Once, the descriptions are added into the database, subsequent retrivals are quick (test screenshots and database saved in results/aiRecall/snapshots; these screenshots are not very diverse)
    
    ![ai_recall_1](https://github.com/shamith2/onnxInsights/assets/43729418/875011d7-43ca-4a2f-b7b2-d828884409a0)
 
