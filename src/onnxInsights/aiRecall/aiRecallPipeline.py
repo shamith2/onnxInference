@@ -499,7 +499,8 @@ def captureSnapshots(
 
 
 def analyse_and_savetoRAG(
-        model_directory: str,
+        vision_model_directory: str,
+        text_model_directory: str,
         tokenizer: Union[str, LlamaTokenizerFast],
         session_options: ORTSessionOptions
 ):
@@ -507,7 +508,7 @@ def analyse_and_savetoRAG(
         tokenizer = LlamaTokenizerFast.from_pretrained(tokenizer)
 
     intermediate_analysis_reports = analyseSnapshots(
-        os.path.join(model_directory, 'vision', 'cpu-int4-rtn-block-32-acc-level-4')
+        vision_model_directory
     )
 
     if len(intermediate_analysis_reports):
@@ -522,7 +523,7 @@ def analyse_and_savetoRAG(
 
             filename = generateFilename(
                 analysis_report[1],
-                os.path.join(model_directory, 'text', 'cpu-int4-rtn-block-32-acc-level-4')
+                text_model_directory
             )
 
             filename = os.path.join(file_directory, filename + '_' + time_ext_identifier)
@@ -534,7 +535,7 @@ def analyse_and_savetoRAG(
         saveAnalysis(
             analysis_reports,
             tokenizer,
-            os.path.join(model_directory, 'vision', 'cpu-int4-rtn-block-32-acc-level-4'),
+            vision_model_directory,
             session_options
         )
 
@@ -543,15 +544,12 @@ def AI_Recall_pipeline(
         model_directory: str,
         query_or_screenshot: str,
         top_p: int,
-        save_directory: str = RESULT_DIR
+        save_directory: str = RESULT_DIR,
+        device: str = 'cpu'
 ) -> int:
     """
     Custom AI Recall pipeline using onnxruntime
     """
-    seq_session_options = ORTSessionOptions('CPU', 'cpu', {}, 2, 0, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
-                                            onnxruntime.ExecutionMode.ORT_SEQUENTIAL,
-                                            onnxruntime.ExecutionOrder.DEFAULT, 3)
-    
     for dir in ['logs', 'images', 'latents']:
         path = os.path.join(save_directory, dir)
         
@@ -573,13 +571,40 @@ def AI_Recall_pipeline(
                 sys.exit()
     
     else:
+        if device == 'cuda':
+            vision_model_directory = os.path.join(model_directory, 'vision', 'cuda-int4-rtn-block-32')
+            text_model_directory = os.path.join(model_directory, 'text', 'cuda', 'cuda-int4-rtn-block-32')
+
+            seq_session_options = ORTSessionOptions('CUDA', 'cuda', {}, 2, 0, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
+                                                    onnxruntime.ExecutionMode.ORT_SEQUENTIAL,
+                                                    onnxruntime.ExecutionOrder.DEFAULT, 3)
+        
+        elif device == 'directml':
+            logging.warning('phi-3 vision model is currently not available for DirectML. Using cpu version...\n')
+            
+            vision_model_directory = os.path.join(model_directory, 'vision', 'cpu-int4-rtn-block-32-acc-level-4')
+            text_model_directory = os.path.join(model_directory, 'text', 'directml', 'directml-int4-awq-block-128')
+
+            seq_session_options = ORTSessionOptions('DirectML', 'dml', {}, 2, 0, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
+                                                    onnxruntime.ExecutionMode.ORT_SEQUENTIAL,
+                                                    onnxruntime.ExecutionOrder.DEFAULT, 3)
+        
+        else:
+            vision_model_directory = os.path.join(model_directory, 'vision', 'cpu-int4-rtn-block-32-acc-level-4')
+            text_model_directory = os.path.join(model_directory, 'text', 'cpu_and_mobile', 'cpu-int4-rtn-block-32-acc-level-4')
+
+            seq_session_options = ORTSessionOptions('CPU', 'cpu', {}, 2, 0, onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL,
+                                                    onnxruntime.ExecutionMode.ORT_SEQUENTIAL,
+                                                    onnxruntime.ExecutionOrder.DEFAULT, 3)
+
         # initialization
-        tokenizer = LlamaTokenizerFast.from_pretrained(os.path.join(model_directory, 'text', 'cpu-int4-rtn-block-32-acc-level-4'))
+        tokenizer = LlamaTokenizerFast.from_pretrained(text_model_directory)
 
         query = query_or_screenshot
 
         analyse_and_savetoRAG(
-            model_directory,
+            vision_model_directory,
+            text_model_directory,
             tokenizer,
             seq_session_options
         )
@@ -588,7 +613,7 @@ def AI_Recall_pipeline(
             query,
             top_p,
             tokenizer,
-            os.path.join(model_directory, 'vision', 'cpu-int4-rtn-block-32-acc-level-4'),
+            vision_model_directory,
             seq_session_options,
             None
         )
