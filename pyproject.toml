@@ -11,7 +11,7 @@ authors = [
     {name = "Shamith Achanta", email = "achantashamith007@gmail.com"},
 ]
 description = "Getting to know more about onnx models: insights into their performance and bottlenecks for practical applications"
-keywords = ["onnxInsights", "onnx", "onnxruntime"]
+keywords = ["onnxInsights", "onnx", "onnxruntime", "static profiling", "stable diffusion pipeline", "ai recall pipeline"]
 readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
