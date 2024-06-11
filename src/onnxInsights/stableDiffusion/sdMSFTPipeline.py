@@ -441,7 +441,7 @@ def SD_Turbo_MSFT_pipeline(
 
     end = time.time() - start
 
-    print('\n----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
+    logging.info('----- Total Inference Time for {} steps: {} s -----\n'.format(steps, end))
 
     # inference times in ms
     inference_times += (text_encoder_1_inference_time, text_encoder_2_inference_time, vae_encoder_inference_time, unet_inference_time, vae_decoder_inference_time, round(end * 1000, 3))
@@ -455,4 +455,3 @@ def SD_Turbo_MSFT_pipeline(
     )
 
     return 0
-
