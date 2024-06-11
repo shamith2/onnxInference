@@ -9,9 +9,9 @@ Getting to know more about onnx models: insights into their performance and bott
  
  * The filenames and descriptions (after chunking) are stored in a simple database for Retrieval-Augmented Generation (RAG). Based on a query, given by the user, the descriptions, along with the associated               filenames of the screenshots, that are similar to the query are retrieved. The Phi-3 models are currently running on the CPU
 
- * Example Run:
+ * Example Run 1:
    
-   ![ai_recall_1](https://github.com/shamith2/onnxInsights/assets/43729418/7c074578-29e8-4389-b0c1-0d81a7d7f66e)
+   ![airecall_1](https://github.com/shamith2/onnxInsights/assets/43729418/89e3fccf-5747-479c-992d-451e9332bc51)
 
  * Best Result:
    
@@ -19,7 +19,7 @@ Getting to know more about onnx models: insights into their performance and bott
 
  * Once, the descriptions are added into the database, subsequent retrivals are quick (test screenshots and database saved in results/aiRecall/snapshots; these screenshots are not very diverse)
    
-   ![ai_recall_1](https://github.com/shamith2/onnxInsights/assets/43729418/875011d7-43ca-4a2f-b7b2-d828884409a0)
+   ![ai_recall_2](https://github.com/shamith2/onnxInsights/assets/43729418/875011d7-43ca-4a2f-b7b2-d828884409a0)
 
 ### Stable Diffusion Pipeline:
   * Scripts to run stable diffusion pipeline, currently on running on DirectML-supported devices
