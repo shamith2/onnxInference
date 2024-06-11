@@ -155,7 +155,35 @@ def init_Inference(
     # disable thread spinning
     sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
 
-    if session_options.execution_provider == 'NPU':
+    if session_options.execution_provider == 'CUDA':
+        ort_session = onnxruntime.InferenceSession(
+            onnx_model_path,
+            providers=['CUDAExecutionProvider'],
+            sess_options=sess_options,
+            provider_options=[
+                {
+                    "device_id": 0, # torch.cuda.current_device(),
+                    "user_compute_stream": str(torch.cuda.current_stream().cuda_stream)
+                }
+            ]
+        )
+
+        if 'CUDAExecutionProvider' not in ort_session.get_providers():
+            raise EnvironmentError(
+                "ONNXRuntime does not support CUDAExecutionProvider. Build ONNXRuntime appropriately")
+
+    elif session_options.execution_provider == 'DirectML':
+        ort_session = onnxruntime.InferenceSession(
+            onnx_model_path,
+            providers=['DmlExecutionProvider'],
+            sess_options=sess_options
+        )
+
+        if 'DmlExecutionProvider' not in ort_session.get_providers():
+            raise EnvironmentError(
+                "ONNXRuntime does not support DmlExecutionProvider. Build ONNXRuntime appropriately")
+
+    elif session_options.execution_provider == 'RyzenAI':
         # set environment variables
         cache_dir, config_file_path, cache_key = init_NPU_Inference(npu_options)
 
@@ -167,25 +195,14 @@ def init_Inference(
                 {
                     "config_file": config_file_path,
                     "cacheDir": cache_dir,
-                    "cacheKey": cache_key,
-                },
-            ],
+                    "cacheKey": cache_key
+                }
+            ]
         )
 
         if 'VitisAIExecutionProvider' not in ort_session.get_providers():
             raise EnvironmentError(
                 "ONNXRuntime does not support VitisAIExecutionProvider. Build ONNXRuntime appropriately")
-    
-    elif session_options.execution_provider == 'GPU':
-        ort_session = onnxruntime.InferenceSession(
-            onnx_model_path,
-            providers=['DmlExecutionProvider'],
-            sess_options=sess_options
-        )
-
-        if 'DmlExecutionProvider' not in ort_session.get_providers():
-            raise EnvironmentError(
-                "ONNXRuntime does not support DmlExecutionProvider. Build ONNXRuntime appropriately")
 
     else:
         ort_session = onnxruntime.InferenceSession(
