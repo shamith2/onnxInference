@@ -24,7 +24,8 @@ def run_recall():
         MODEL_DIR,
         query_or_screenshot='Microsoft Keynote',
         top_p=3,
-        save_directory=RESULT_DIR
+        save_directory=RESULT_DIR,
+        device='cpu'
     )
 
 def capture_screenshots():
