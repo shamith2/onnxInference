@@ -560,9 +560,6 @@ def AI_Recall_pipeline(
 
     start = time.time()
 
-    # initialization
-    tokenizer = LlamaTokenizerFast.from_pretrained(os.path.join(model_directory, 'text', 'cpu-int4-rtn-block-32-acc-level-4'))
-
     screenshot_process = multiprocessing.Process(target=captureSnapshots, args=(5, 12))
 
     if query_or_screenshot is None:
@@ -576,6 +573,9 @@ def AI_Recall_pipeline(
                 sys.exit()
     
     else:
+        # initialization
+        tokenizer = LlamaTokenizerFast.from_pretrained(os.path.join(model_directory, 'text', 'cpu-int4-rtn-block-32-acc-level-4'))
+
         query = query_or_screenshot
 
         analyse_and_savetoRAG(
