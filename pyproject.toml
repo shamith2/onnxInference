@@ -27,7 +27,6 @@ dependencies = [
     "cmake",
     "onnx",
     "numpy",
-    "torch",
     "optimum",
     "diffusers",
     "scipy",
