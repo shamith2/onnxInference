@@ -576,12 +576,10 @@ class ONNXInference:
             self.xclbin_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)
 
             if layout == '1x4':
-                os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_Nx4_Overlay"
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_Nx4_Overlay.xclbin')
                 os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 8))
 
             elif layout == '4x4':
-                os.environ['XLNX_TARGET_NAME'] = "AMD_AIE2P_4x4_Overlay"
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_4x4_Overlay.xclbin')
                 os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 2))
 
