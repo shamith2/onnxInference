@@ -2,7 +2,7 @@
 Getting to know more about onnx models: insights into their performance and bottlenecks for practical applications and pipelines
 
 - onnxHelpers/onnxBenchmark.py = script to convert pytorch model to onnx, quantize fp32 onnx models to int8, and run benchmark inference on AMD Ryzen AI processor
-- onnxHelpers/onnxTransformer.py = script to modify operators in onnx models
+- onnxHelpers/onnxTransformer.py = script to modify operators in onnx models and statically profile memory requirements of onnx models
 
 ### Custom AI Recall Pipeline:
  * Implemented custom AI Recall feature, similar to Microsoft Windows AI Recall feature, running locally with Phi-3 Vision model for describing/analysing screenshots and Phi-3 Mini model to rename the screenshots        based on the image description geneated by the vision model.
