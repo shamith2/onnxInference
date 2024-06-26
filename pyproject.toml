@@ -26,7 +26,7 @@ dependencies = [
     "pytest",
     "cmake",
     "onnx",
-    "numpy",
+    "numpy<2.0.0",
     "optimum",
     "diffusers",
     "scipy",
