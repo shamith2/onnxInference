@@ -543,7 +543,7 @@ class ONNXTransformer:
 
         grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False, mode='w')
 
-        logging.info('Use this command "{}" to view the profiling summary in PowerShell on Windows'.format(self.render(self.profile_logs_directory, self.model_name + '_summary.csv')))
+        logging.debug('Use this command "{}" to view the profiling summary in PowerShell on Windows'.format(self.render(self.profile_logs_directory, self.model_name + '_summary.csv')))
 
 
     def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):

@@ -14,7 +14,15 @@ from pathlib import Path
 root = Path(__file__).parents[2].resolve()
 workspace = Path(__file__).parent.resolve()
 
-filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', 'sdxlt_unet_summary.csv')
+try:
+    model_name = sys.argv[1]
+    threshold = int(sys.argv[2])
+
+except IndexError:
+    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [size of NPU on-chip memory in MB]")
+    sys.exit()
+
+filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', '_'.join(model_name.lower().split(' ')) + '_summary.csv')
 save_directory = os.path.join(root, 'results', 'onnxProfile', 'plots')
 
 if not os.path.exists(save_directory):
@@ -31,14 +39,6 @@ optimized_operator_timeline = ()
 optimized_operator_usage_timeline = ()
 histogram_dict1 = {}
 histogram_dict2 = {}
-
-try:
-    model_name = sys.argv[1]
-    threshold = int(sys.argv[2])
-
-except IndexError:
-    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [size of NPU on-chip memory in MB]")
-    sys.exit()
 
 
 def getDictKey(element, threshold):
