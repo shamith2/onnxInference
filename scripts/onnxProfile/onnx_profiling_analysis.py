@@ -16,13 +16,14 @@ workspace = Path(__file__).parent.resolve()
 
 try:
     model_name = sys.argv[1]
-    threshold = int(sys.argv[2])
+    filename = sys.argv[2]
+    threshold = int(sys.argv[3])
 
 except IndexError:
-    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [size of NPU on-chip memory in MB]")
+    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [analysis csv filename] [size of NPU on-chip memory in MB]")
     sys.exit()
 
-filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', '_'.join(model_name.lower().split(' ')) + '_summary.csv')
+filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', filename + '_summary.csv')
 save_directory = os.path.join(root, 'results', 'onnxProfile', 'plots')
 
 if not os.path.exists(save_directory):
