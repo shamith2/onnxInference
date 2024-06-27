@@ -23,6 +23,7 @@ import pandas
 import logging
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 __producer__ = "onnxTransformer"
@@ -65,18 +66,24 @@ def checkandSaveModel(
             os.remove(path)
 
     try:
-        onnx.checker.check_model(model)
+        onnx.checker.check_model(model, check_custom_domain=True)
         
-        onnx.save(filename_with_extension)
+        onnx.save(model, filename_with_extension)
 
         logger.info("Model saved as {}".format(filename_with_extension))
     
-    except ValueError:
+    except ValueError or onnx.onnx_cpp2py_export.checker.ValidationError:
         external_data = filename + '.onnx_data'
 
         onnx.save(model, filename_with_extension, save_as_external_data=True, all_tensors_to_one_file=True, location=external_data, size_threshold=1024)
 
-        onnx.checker.check_model(filename_with_extension)
+        # onnx.checker.check_model(filename_with_extension, check_custom_domain=True)
+
+        # alternative for onnx.checker.check_model with custom domain operators
+        _ = onnxruntime.InferenceSession(
+            filename_with_extension,
+            providers=["CPUExecutionProvider"]
+        )
 
         logger.info("Model saved as {} with external data saved as {} in the same directory as the model".format(filename_with_extension, external_data))
     
@@ -607,7 +614,7 @@ class ONNXTransformer:
                 self.initializers.remove(self.initializer_dict[initializer_name])
         
         try:
-            onnx.checker.check_model(self.onnx_model)
+            onnx.checker.check_model(self.onnx_model, check_custom_domain=True)
         
         except onnx.checker.ValidationError as e:
             raise Exception(e)
