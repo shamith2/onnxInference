@@ -1,5 +1,4 @@
-# This script contains functions for modifying ONNX graphs
-# TODO: include ONNX graph optimizations
+# This script contains functions for profiling and modifying ONNX graphs
 
 import copy
 import os
@@ -23,11 +22,11 @@ import pandas
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger().setLevel(logging.DEBUG)
+# logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 __producer__ = "onnxTransformer"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 
 DTYPES = {
@@ -37,6 +36,7 @@ DTYPES = {
     'TensorProto.UINT16': 2,
     'TensorProto.INT16': 2,
     'TensorProto.FLOAT16': 2,
+    'TensorProto.INT32': 4,
     'TensorProto.FLOAT': 4,
     'TensorProto.INT64': 8,
     'TensorProto.DOUBLE': 8,
@@ -72,18 +72,20 @@ def checkandSaveModel(
 
         logger.info("Model saved as {}".format(filename_with_extension))
     
-    except ValueError or onnx.onnx_cpp2py_export.checker.ValidationError:
+    except ValueError:
         external_data = filename + '.onnx_data'
 
         onnx.save(model, filename_with_extension, save_as_external_data=True, all_tensors_to_one_file=True, location=external_data, size_threshold=1024)
 
-        # onnx.checker.check_model(filename_with_extension, check_custom_domain=True)
+        try:
+            onnx.checker.check_model(filename_with_extension, check_custom_domain=True)
 
-        # alternative for onnx.checker.check_model with custom domain operators
-        _ = onnxruntime.InferenceSession(
-            filename_with_extension,
-            providers=["CPUExecutionProvider"]
-        )
+        except onnx.onnx_cpp2py_export.checker.ValidationError:
+            # alternative for onnx.checker.check_model with custom domain operators
+            _ = onnxruntime.InferenceSession(
+                filename_with_extension,
+                providers=["CPUExecutionProvider"]
+            )
 
         logger.info("Model saved as {} with external data saved as {} in the same directory as the model".format(filename_with_extension, external_data))
     
@@ -253,7 +255,12 @@ class ONNXTransformer:
         assert checkandSaveModel(inferred_model, self.extension, self.infer_model_directory, self.model_name + '_inferred') == 0, "checkandSaveModel() failed"
 
         os.remove(intermediate_model_file)
-        os.remove(intermediate_model_file.removesuffix(self.extension) + '.onnx_data')
+
+        try:
+            os.remove(intermediate_model_file.removesuffix(self.extension) + '.onnx_data')
+        
+        except FileNotFoundError:
+            pass
 
         return inferred_model_file
 
@@ -444,6 +451,12 @@ class ONNXTransformer:
         operators.sort()
         self.count_operators = {op: int(self.unsorted_count_operators[op]) for op in operators}
 
+        # remove operators not in self.valid_nodes_list
+        valid_ops = set([elem[1] for elem in self.valid_nodes_list])
+
+        for op in list(self.count_operators):
+            if op not in valid_ops:
+                del self.count_operators[op]
 
         # params size and memory size for inputs and outputs
         self.input_params_dict, self.input_memory_dict = self.getMemoryInfo(self.node_input_dict)
@@ -512,11 +525,12 @@ class ONNXTransformer:
         # total
         dataframe.loc['Total'] = dataframe.sum(numeric_only=True).round(0)
 
+        dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False, mode='w')
+
         # grouping by operator
         grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)',
                                        'Weights and Bias Memory (in Bytes)', 'Weights and Bias Memory (%)',
-                                       'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(
-                                    ['Operator']).sum().reset_index()
+                                       'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
 
         # operator count and percent
         grouped_dataframe.insert(1, 'Count', list(self.count_operators.values()))
@@ -526,10 +540,8 @@ class ONNXTransformer:
         grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True).round(0)
 
         grouped_dataframe = grouped_dataframe.round(3)
-       
-        dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False)
 
-        grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False)
+        grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False, mode='w')
 
         logging.info('Use this command "{}" to view the profiling summary in PowerShell on Windows'.format(self.render(self.profile_logs_directory, self.model_name + '_summary.csv')))
 

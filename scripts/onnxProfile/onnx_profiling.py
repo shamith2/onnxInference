@@ -37,29 +37,29 @@ def get_shapes(model_path):
 
 # inferred_onnx_model_path = onnx_t.shapeInfer('sdxlt_unet', uninferred_onnx_model_path, [(1, 4, 64, 64), (1,), (1, 77, 2048), (1, 1280), (1, 6)], [(1, 4, 64, 64)])
 
-# for llm: phi 1.5
-PHASE = 'PROMPT'
+# for llm: tiny llama
+PHASE = 'TOKEN'
 BATCH_SIZE = 1
-SEQ_LEN = 2048 if PHASE == 'PROMPT' else 1
-MAX_LEN = 4096
-CACHE_LEN = 1 if PHASE == 'PROMPT' else MAX_LEN
+SEQ_LEN = 1024 if PHASE == 'PROMPT' else 1
+MAX_LEN = 2048
+CACHE_LEN = 1 if PHASE == 'PROMPT' else MAX_LEN - 1
 
-uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'model.onnx')
+uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'model_quantized.onnx')
 
-input_shapes = [(BATCH_SIZE, SEQ_LEN), (1, MAX_LEN), (BATCH_SIZE, SEQ_LEN)]
+input_shapes = [(BATCH_SIZE, SEQ_LEN), (BATCH_SIZE, MAX_LEN), (BATCH_SIZE, SEQ_LEN)]
 
-for i in range(24):
-    input_shapes.append((BATCH_SIZE, 32, MAX_LEN - 1, 64)) # for key
-    input_shapes.append((BATCH_SIZE, 32, MAX_LEN - 1, 64)) # for value
+for i in range(22):
+    input_shapes.append((BATCH_SIZE, 4, CACHE_LEN, 64)) # for key
+    input_shapes.append((BATCH_SIZE, 4, CACHE_LEN, 64)) # for value
 
-output_shapes = [(BATCH_SIZE, SEQ_LEN, 51200)]
+output_shapes = [(BATCH_SIZE, SEQ_LEN, 32000)]
 
-for i in range(24):
-    output_shapes.append((BATCH_SIZE, 32, MAX_LEN, 64)) # for key
-    output_shapes.append((BATCH_SIZE, 32, MAX_LEN, 64)) # for value
+for i in range(22):
+    output_shapes.append((BATCH_SIZE, 4, MAX_LEN, 64)) # for key
+    output_shapes.append((BATCH_SIZE, 4, MAX_LEN, 64)) # for value
 
 inferred_onnx_model_path = onnx_t.shapeInfer(
-    'phi-1_5',
+    'tinyllama',
     uninferred_llm_onnx_model_path,
     input_shapes,
     output_shapes
