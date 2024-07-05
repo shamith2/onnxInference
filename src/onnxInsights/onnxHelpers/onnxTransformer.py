@@ -436,7 +436,7 @@ class ONNXTransformer:
             self
     ) -> None:
         dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'Inputs Shape', 'Output Shape',
-                                              'Weights and Bias Shape', 'Inputs Size', 'Output Size',
+                                              'Weights and Bias Shape', 'Inputs Size', 'Weights and Bias Size', 'Output Size',
                                               'Inputs Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
                                               'Output Memory (in Bytes)'])
 
@@ -447,6 +447,7 @@ class ONNXTransformer:
                                      _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.input_params_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.input_memory_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_memory_dict[node], add=True),
