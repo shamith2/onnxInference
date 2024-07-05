@@ -37,12 +37,12 @@ def get_shapes(model_path):
 
 # inferred_onnx_model_path = onnx_t.shapeInfer('sdxlt_unet', uninferred_onnx_model_path, [(1, 4, 64, 64), (1,), (1, 77, 2048), (1, 1280), (1, 6)], [(1, 4, 64, 64)])
 
-# for llm: tiny llama
-PHASE = 'PROMPT'
+# for llm: llama
+PHASE = 'DECODE'
 BATCH_SIZE = 1
-SEQ_LEN = 1024 if PHASE == 'PROMPT' else 1
+SEQ_LEN = 1024 if PHASE == 'PREFILL' else 1
 MAX_LEN = 2048
-CACHE_LEN = 1 if PHASE == 'PROMPT' else MAX_LEN - 1
+CACHE_LEN = 1 if PHASE == 'PREFILL' else MAX_LEN - 1
 
 uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'rank_0_Meta-Llama-3-8B-Instruct_decoder_merged_model_fp16.onnx')
 
