@@ -16,11 +16,12 @@ workspace = Path(__file__).parent.resolve()
 
 try:
     model_name = sys.argv[1]
-    filename = sys.argv[2]
-    threshold = int(sys.argv[3])
+    metadata = sys.argv[2]
+    filename = sys.argv[3]
+    threshold = int(sys.argv[4])
 
 except IndexError:
-    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [analysis csv filename] [size of NPU on-chip memory in MB]")
+    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [metadata] [analysis csv filename] [size of NPU on-chip memory in MB]")
 
 model_dir = '_'.join(model_name.lower().split(' '))
 filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', model_dir, filename + '_summary.csv')
@@ -204,7 +205,7 @@ if histogram_dict1 and histogram_dict2:
 
     plt.tight_layout()
 
-    fig.savefig(os.path.join(save_directory, model_dir + '_' + str(threshold) + 'mb_' + 'pie_plot.png'))
+    fig.savefig(os.path.join(save_directory, model_dir + '_' + metadata + '_' + str(threshold) + 'mb_' + 'pie_plot.png'))
 
     plt.close(fig)
 
@@ -280,6 +281,6 @@ if histogram_dict1 and histogram_dict2:
     
     plt.tight_layout()
 
-    fig.savefig(os.path.join(save_directory, model_dir + '_' + str(threshold) + 'mb_' + 'operators_plot.png'))
+    fig.savefig(os.path.join(save_directory, model_dir + '_' + metadata + '_' + str(threshold) + 'mb_' + 'operators_plot.png'))
 
     plt.close(fig)
