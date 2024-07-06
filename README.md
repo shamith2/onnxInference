@@ -2,7 +2,7 @@
 Getting to know more about onnx models: insights into their performance and bottlenecks for practical applications and pipelines
 
 - onnxHelpers/onnxBenchmark.py = script to convert pytorch model to onnx, quantize fp32 onnx models to int8, and run benchmark inference on AMD Ryzen AI processor
-- onnxHelpers/onnxTransformer.py = script to modify operators in onnx models and statically profile memory requirements of onnx models
+- onnxHelpers/onnxTransformer.py = script to statically profile memory and compute requirements of onnx models and modify operators in onnx models
 
 ### Custom AI Recall Pipeline:
  * Implemented custom AI Recall feature, similar to Microsoft Windows AI Recall feature, running locally with Phi-3 Vision model for describing/analysing screenshots and Phi-3 Mini model to rename the screenshots        based on the image description geneated by the vision model.
@@ -26,8 +26,6 @@ Getting to know more about onnx models: insights into their performance and bott
 
   ![image](https://github.com/shamith2/onnxInsights/blob/db91c3483d4ad8f8ab8d5dc2a1379b03268bebb3/results/stableDiffusion/sd_turbo_results/SD%202.1%20Turbo_visualize_1.png)
 
-### ONNX Model Static Memory Profiling:
-  * #### Stable Diffusion XL Turbo UNet:
-    * Profiling Operator-wise Grouped Summary: ![profile-grouped-summary-csv](https://github.com/shamith2/onnxInsights/blob/main/results/onnxProfile/logs/sdxlt_unet_grouped_summary.csv)
-
-For running and testing onnx models, I am currently running them on AMD Ryzen APUs using Radeon iGPU + Ryzen AI processor
+### ONNX Model Static Memory and Compute Profiling:
+  * #### Llama3 8B FP16 model:
+    * Profiling Operator-wise Grouped Summary: ![profile-grouped-summary-csv](https://github.com/shamith2/onnxInsights/blob/a621f686bc7444fae0556a17209fa5cfdae4f076/results/onnxProfile/logs/llama3_8b_fp16/llama3_8b_fp16_decodePhase_grouped_summary.csv)
