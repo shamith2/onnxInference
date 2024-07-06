@@ -16,9 +16,9 @@ import onnxruntime
 from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
 
 from .onnxBenchmark import get_random_input
+from .onnxOPS import OPERATORS
 
 import pandas
-
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 __producer__ = "onnxTransformer"
-__version__ = "0.2.1"
+__version__ = "0.2.5"
 
 
 DTYPES = {
@@ -115,16 +115,19 @@ def _convert_shape_tuple_to_string(
 
 class ONNXTransformer:
     def __init__(
-            self
+            self,
+            model_name: str
     ):
         self.extension = '.onnx'
 
         self.root = Path(__file__).parents[3].resolve()
         self.workspace = Path(__file__).parent.resolve()
 
+        model_name = '_'.join(model_name.split(' ')).lower()
+
         self.prof_directory = os.path.join(self.root, 'results', 'onnxProfile')
-        self.infer_model_directory = os.path.join(self.prof_directory, 'models')
-        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs')
+        self.infer_model_directory = os.path.join(self.prof_directory, 'models', model_name)
+        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_name)
 
         for p in [self.prof_directory, self.infer_model_directory, self.profile_logs_directory]:
             if not os.path.exists(p):
@@ -221,14 +224,6 @@ class ONNXTransformer:
         return save_path
 
 
-    def render(
-        self,
-        file_directory: str,
-        filename: str
-    ) -> None:
-        return "Import-Csv " + os.path.join(file_directory, filename) + " | Out-GridView"
-
-
     def shapeInfer(
             self,
             model_name: str,
@@ -291,36 +286,71 @@ class ONNXTransformer:
         return tensor_dict, weight_dict
     
 
-    def getMemoryInfo(
-            self,
-            node_param_dict: dict
-    ) -> tuple[dict, dict]:
-        params_dict = {}
-        memory_dict = {}
+    def getMemoryandMacInfo(
+            self
+    ) -> None:
+        def _get_memory_info(node_param_dict):
+            params_dict = {}
+            memory_dict = {}
 
-        for node in node_param_dict:
-            name, shape, size = node_param_dict[node]
-            count = len(name)
+            for node in node_param_dict:
+                name, shape, size = node_param_dict[node]
+                count = len(name)
 
-            params_size = ()
-            memory_size = ()
+                params_size = ()
+                memory_size = ()
 
-            for i in range(count):
-                param_size = numpy.prod(shape[i], dtype=numpy.int64)
+                for i in range(count):
+                    param_size = numpy.prod(shape[i], dtype=numpy.int64)
 
-                params_size += ((param_size.item(),),)
-                memory_size += (((param_size * size[i]).item(),),)
+                    params_size += ((param_size.item(),),)
+                    memory_size += (((param_size * size[i]).item(),),)
 
-            params_dict[node] = params_size if params_size else ((0,),)
-            memory_dict[node] = memory_size if memory_size else ((0,),)
-        
-        return params_dict, memory_dict
+                params_dict[node] = params_size if params_size else ((0,),)
+                memory_dict[node] = memory_size if memory_size else ((0,),)
+
+            return params_dict, memory_dict
+
+        self.input_params_dict, self.input_memory_dict = _get_memory_info(self.node_input_dict)
+        self.wb_params_dict, self.wb_memory_dict = _get_memory_info(self.node_wb_dict)
+        self.output_params_dict, self.output_memory_dict = _get_memory_info(self.node_output_dict)
+
+        self.op_macs_dict = {}
+
+        for node in self.output_params_dict:
+            wb_param_size = self.wb_params_dict[node][0][0]
+
+            name_of_nodes = [x[0] for x in self.valid_nodes_list]
+            op_type = self.valid_nodes_list[name_of_nodes.index(node)][1].upper()
+
+            if wb_param_size == 0:
+                self.op_macs_dict[node] = ((self.output_params_dict[node][0][0] * OPERATORS[op_type][0]['MACS'],),)
+
+            else:
+                # matmul = (b, m, n) * (b, n, p) -> (b, m, p)
+                if op_type == 'MATMUL':
+                    # multiply_const = numpy.prod(self.node_input_dict[node][1][0], dtype=numpy.int64) * self.node_wb_dict[node][1][0][-1]
+                    multiply_const = self.input_params_dict[node][0][0] * self.node_wb_dict[node][1][0][-1]
+
+                    self.op_macs_dict[node] = ((multiply_const * OPERATORS[op_type][0]['MACS'],),)
+
+                # mul = (b, m, n) * (n,) -> (b, m, n)
+                elif op_type == 'MUL':                    
+                    # multiply_const = numpy.prod(self.node_input_dict[node][1][0], dtype=numpy.int64)
+                    multiply_const = self.input_params_dict[node][0][0]
+                    
+                    self.op_macs_dict[node] = ((multiply_const * OPERATORS[op_type][0]['MACS'],),)
+                
+                else:
+                    self.op_macs_dict[node] = ((self.output_params_dict[node][0][0] * OPERATORS[op_type][0]['MACS'],),)
 
 
-    def profileMemory(
+    def profileModel(
             self,
             onnx_model_path: str
     ) -> int:
+        logger.info("Profiling Model")
+
         # onnx model graph for profiling
         graph = onnx.load(onnx_model_path).graph
 
@@ -420,22 +450,20 @@ class ONNXTransformer:
                 del self.count_operators[op]
 
         # params size and memory size for inputs and outputs
-        self.input_params_dict, self.input_memory_dict = self.getMemoryInfo(self.node_input_dict)
-
-        self.wb_params_dict, self.wb_memory_dict = self.getMemoryInfo(self.node_wb_dict)
-
-        self.output_params_dict, self.output_memory_dict = self.getMemoryInfo(self.node_output_dict)
+        self.getMemoryandMacInfo()
 
         # summarize
         self.summarize()
 
+        logging.info("Profiling logs stored in directory: {}".format(self.profile_logs_directory))
+
         return 0
-    
+
 
     def summarize(
             self
     ) -> None:
-        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'Inputs Shape', 'Output Shape',
+        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'MACS', 'Inputs Shape', 'Output Shape',
                                               'Weights and Bias Shape', 'Inputs Size', 'Weights and Bias Size', 'Output Size',
                                               'Inputs Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
                                               'Output Memory (in Bytes)'])
@@ -443,6 +471,7 @@ class ONNXTransformer:
         for node, op_type in self.valid_nodes_list:
             row = pandas.DataFrame([[node, op_type,
                                      _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.op_macs_dict[node]),
                                      _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
@@ -458,27 +487,35 @@ class ONNXTransformer:
         
         # type-cast
         dataframe['Number of Params'] = dataframe['Number of Params'].astype('int64')
+        dataframe['MACS'] = dataframe['MACS'].astype('int64')
         dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype('int64')
         dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype('int64')
         dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
         
         # params percent
         dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100.0).astype('float64') / dataframe['Number of Params'].sum()).astype('float64').round(3))
-
+        
         # memory
         dataframe.insert(4, 'Memory (in Bytes)', (dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)']).astype('int64'))
 
         # memory percent
         dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
 
-        dataframe.insert(6, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
+        # operator macs percent
+        dataframe.insert(7, 'MACS (%)', ((dataframe['MACS'] * 100.0).astype('float64') / dataframe['MACS'].sum()).astype('float64').round(3))
+        
+        # compute-to-memory percent
+        dataframe.insert(8, 'Compute-to-Memory Ratio (MACS/Byte)', ((dataframe['MACS']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
+        
+        # memory percent
+        dataframe.insert(9, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
         
-        dataframe.insert(7, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100.0).astype('float64') / 
+        dataframe.insert(10, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
-        
+
         # Memory in MB
         dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(6)
         dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(6)
@@ -490,13 +527,17 @@ class ONNXTransformer:
         dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False, mode='w')
 
         # grouping by operator
-        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)',
-                                       'Weights and Bias Memory (in Bytes)', 'Weights and Bias Memory (%)',
-                                       'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
+        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)', 'MACS',
+                                       'MACS (%)', 'Compute-to-Memory Ratio (MACS/Byte)', 'Weights and Bias Memory (in Bytes)',
+                                       'Weights and Bias Memory (%)', 'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
 
         # operator count and percent
         grouped_dataframe.insert(1, 'Count', list(self.count_operators.values()))
         grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100.0).astype('float64') / grouped_dataframe['Count'].sum()).astype('float64').round(3))
+
+        grouped_dataframe.insert(9, 'Average Compute-to-Memory Ratio (MACS/Byte)', ((grouped_dataframe['Compute-to-Memory Ratio (MACS/Byte)']).astype('float64') / grouped_dataframe['Count']).astype('float64').round(3))
+        
+        grouped_dataframe = grouped_dataframe.drop(['Compute-to-Memory Ratio (MACS/Byte)'], axis=1)
 
         # total
         grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True).round(0)
@@ -505,13 +546,11 @@ class ONNXTransformer:
 
         grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False, mode='w')
 
-        logging.debug('Use this command "{}" to view the profiling summary in PowerShell on Windows'.format(self.render(self.profile_logs_directory, self.model_name + '_summary.csv')))
 
-
-    def profileModel(
+    def profileModelonCPU(
             self,
             onnx_model_path: str
-    ):
+    ) -> str:
         sess_options = onnxruntime.SessionOptions()
 
         sess_options.intra_op_num_threads = 1
@@ -544,8 +583,7 @@ class ONNXTransformer:
 
         shutil.move(os.path.join(self.workspace, prof_file), prof_path)
 
-        # return prof_path
-        raise NotImplementedError
+        return prof_path
 
 
     def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):
@@ -634,6 +672,4 @@ class ONNXTransformer:
             raise Exception(e)
         
         onnx.save_model(self.onnx_model, self.model_name + '_modified.onnx')
-
-        raise NotImplementedError
 

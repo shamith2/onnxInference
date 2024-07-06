@@ -2,69 +2,53 @@
 # Operators as listed on https://onnx.ai/onnx/operators/
 # Needs verification
 
+# MACS for atomic-like operators
+MEM_MAC = 0
+ADD_MAC = 1
+MUL_MAC = 1
+MUL_ADD_MAC = 1
+CMP_MAC = 1
+DIV_MAC = 4
+SQRT_MAC = 4
+LOG_MAC = 4
+EXP_MAC = 8
+TRIG_MAC = 8
+
+# dict of ONNX Operators
 OPERATORS = {
-    'OPERATOR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'ABS': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'ACOS': {'ADD': 1, 'MUL': 2, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'ACOSH': {'ADD': 2, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 1, 'LOG': 1, 'CMP': 0, 'TRIG': 0},
-    'ADD': {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'AFFINEGRID': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'AND': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'ARGMAX': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'ARGMIN': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'ASIN': {'ADD': 1, 'MUL': 2, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'ASINH': {'ADD': 2, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 1, 'LOG': 1, 'CMP': 0, 'TRIG': 0},
-    'ATAN': {'ADD': 2, 'MUL': 2, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'ATANH': {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 0, 'LOG': 1, 'CMP': 0, 'TRIG': 0},
-    'AVERAGEPOOL': {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'BATCHNORMALIZATION': {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'BERNOULLI': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'BITSHIFT': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'BITWISEAND': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'BITWISENOT': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'BITWISEOR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'BITWISEXOR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'BLACKMANWINDOW': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'CAST': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'CASTLIKE': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'CEIL': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'CELU': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 2, 'TRIG': 0},
-    'CENTERCROPPAD': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'CLIP': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 2, 'TRIG': 0},
-    'COL2IM': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'COMPRESS': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'CONCAT': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONCATFROMSEQUENCE': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONSTANT': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONSTANTOFSHAPE': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONV': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONVINTEGER': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONVINTEGER': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CONVTRANSPOSE': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'COS': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 1},
-    'COSH': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 2, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'CUMSUM': {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'DFT': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'DEFORMCONV': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'DEPTHTOSPACE': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'DEQUANTIZELINEAR': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'DET': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'DIV': {'ADD': 0, 'MUL': 0, 'DIV': 1, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'DROPOUT': {'ADD': 0, 'MUL': 2, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'DYNAMICQUANTIZELINEAR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'EINSUM': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'ELU': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'EQUAL': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'ERF': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'EXP': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'EXPAND': {'ADD': 0, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'EYELIKE': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'FLATTEN': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'FLOOR': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0},
-    'GRU': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'GATHER': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0},
-    'GATHERELEMENTS': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'GATHERND': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'GELU': {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # TODO
-    'GEMM': {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0}, # VERIFY
+    'OPERATOR': [{'MACS': 0}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'ADD': [{'MACS': ADD_MAC}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'AND': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
+    'BATCHNORMALIZATION': [{'MACS': 2*ADD_MAC + MUL_MAC + DIV_MAC + SQRT_MAC}, {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'CAST': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
+    'CONCAT': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'CONSTANT': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'CONSTANTOFSHAPE': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'COS': [{'MACS': TRIG_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 1, 'MEM': 0}],
+    'DIV': [{'MACS': DIV_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 1, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'EQUAL': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
+    'EXPAND': [{'MACS': MUL_MAC}, {'ADD': 0, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'GATHER': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'GREATER': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
+    'GEMM': [{'MACS': MUL_ADD_MAC}, {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'MATMUL': [{'MACS': MUL_ADD_MAC}, {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'MATMULNBITS': [{'MACS': MUL_ADD_MAC}, {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'MUL': [{'MACS': MUL_ADD_MAC}, {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'NEG': [{'MACS': MUL_MAC}, {'ADD': 0, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'POW': [{'MACS': EXP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'RANGE': [{'MACS': ADD_MAC + 2*CMP_MAC + 1*DIV_MAC}, {'ADD': 1, 'MUL': 0, 'DIV': 1, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 2, 'TRIG': 0, 'MEM': 0}],
+    'REDUCEMEAN': [{'MACS': ADD_MAC}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'RESHAPE': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'SCATTERND': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'SHAPE': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'SIGMOID': [{'MACS': ADD_MAC + MUL_MAC + EXP_MAC + DIV_MAC}, {'ADD': 1, 'MUL': 1, 'DIV': 1, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'SIN': [{'MACS': TRIG_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 1, 'MEM': 0}],
+    'SLICE': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'SOFTMAX': [{'MACS': ADD_MAC + EXP_MAC}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'SQRT': [{'MACS': SQRT_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'TRANSPOSE': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'TRILU': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
+    'UNSQUEEZE': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
+    'WHERE': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0, 'MEM': 0}],
 }
+

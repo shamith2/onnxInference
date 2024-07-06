@@ -23,8 +23,9 @@ except IndexError:
     raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [analysis csv filename] [size of NPU on-chip memory in MB]")
     sys.exit()
 
-filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', filename + '_summary.csv')
-save_directory = os.path.join(root, 'results', 'onnxProfile', 'plots')
+model_dir = '_'.join(model_name.lower().split(' '))
+filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', model_dir, filename + '_summary.csv')
+save_directory = os.path.join(root, 'results', 'onnxProfile', 'plots', model_dir)
 
 if not os.path.exists(save_directory):
     os.makedirs(save_directory)
@@ -204,7 +205,7 @@ if histogram_dict1 and histogram_dict2:
 
     plt.tight_layout()
 
-    fig.savefig(os.path.join(save_directory, '_'.join(model_name.lower().split(' ')) + '_' + str(threshold) + 'mb_' + 'pie_plot.png'))
+    fig.savefig(os.path.join(save_directory, model_dir + '_' + str(threshold) + 'mb_' + 'pie_plot.png'))
 
     plt.close(fig)
 
@@ -256,6 +257,6 @@ if histogram_dict1 and histogram_dict2:
     
     plt.tight_layout()
 
-    fig.savefig(os.path.join(save_directory, '_'.join(model_name.lower().split(' ')) + '_' + str(threshold) + 'mb_' + 'operators_plot.png'))
+    fig.savefig(os.path.join(save_directory, model_dir + '_' + str(threshold) + 'mb_' + 'operators_plot.png'))
 
     plt.close(fig)
