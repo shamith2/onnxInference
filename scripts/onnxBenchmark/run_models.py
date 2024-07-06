@@ -280,7 +280,7 @@ if __name__ == '__main__':
     # tunable parameters
 
     parser = argparse.ArgumentParser(
-        description='ONNX Benchmarking on Strix IPU/NPU. Use default values for optimal performance.')
+        description='ONNX Benchmarking on AMD Ryzen Strix Point NPU. Use default values for optimal performance.')
     parser.add_argument('--models', type=str, nargs='+', action='store',
                         help='names of models to run inference on. names should match the name each model was quantized as. if --quantize is used, models will be quntized under the given names. ' +
                              'default: --models deeplabv3 inceptionv4 mobilenetv3 resnet50 yolov3',
