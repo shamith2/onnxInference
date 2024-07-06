@@ -21,7 +21,6 @@ try:
 
 except IndexError:
     raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [analysis csv filename] [size of NPU on-chip memory in MB]")
-    sys.exit()
 
 model_dir = '_'.join(model_name.lower().split(' '))
 filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', model_dir, filename + '_summary.csv')
@@ -198,7 +197,7 @@ if histogram_dict1 and histogram_dict2:
     # set title
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU cache\n', fontweight='bold')
+                 '(on-chip memory) with no NPU cache\n\n', fontweight='bold')
     
     ax1.set_title('Breakdown based on Count')
     ax2.set_title('Breakdown based on Weighed Count')
@@ -209,35 +208,59 @@ if histogram_dict1 and histogram_dict2:
 
     plt.close(fig)
 
-    x = range(len(optimized_operator_timeline))
-
     unique_ops = list(set(optimized_operator_timeline))
     num_unique_ops = len(unique_ops)
 
+    operator_memory_list = [int(key[0]) for key in optimized_memory_usage.keys()]
+
+    max_operator_memory = max(operator_memory_list)
+
+    # adapted from https://stackoverflow.com/questions/62802061/python-find-outliers-inside-a-list
+    def find_outliers(data: list, m: int = 7):
+        data = numpy.asarray(data)
+        d = numpy.abs(data - numpy.median(data))
+        median_d = numpy.median(d)
+        std_dev = d / (median_d if median_d else 1.0)
+        
+        return data[numpy.nonzero(std_dev > m)]
+
+    # find and remove outliers while plotting operators' memory values
+    outlier_list = find_outliers(operator_memory_list)
+
+    refined_operator_timeline = ()
+    refined_operator_usage_timeline = ()
+
+    for outlier in outlier_list:
+        for i, elem in enumerate(optimized_operator_usage_timeline):
+            if math.ceil(elem) < outlier:
+                refined_operator_timeline += (optimized_operator_timeline[i],)
+                refined_operator_usage_timeline += (optimized_operator_usage_timeline[i],)
+
     plot_ops = []
+    refined_unique_ops = list(set(refined_operator_timeline))
 
-    for i, op in enumerate(optimized_operator_timeline):
-        plot_ops.append(unique_ops.index(op))
-
-    max_operator_memory = max([int(key[0]) for key in optimized_memory_usage.keys()])
+    for i, op in enumerate(refined_operator_timeline):
+        plot_ops.append(refined_unique_ops.index(op))
 
     fig, ax = plt.subplots(figsize=(18, 12))
 
+    x = range(len(refined_operator_timeline))
+
     scatter = ax.scatter(
         x,
-        optimized_operator_usage_timeline,
+        refined_operator_usage_timeline,
         c=plot_ops
     )
 
     # set axes labels and title
     ax.set_xticks(x)
-    ax.set_yticks(range(0, max_operator_memory + 1, 5))
+    ax.set_yticks(range(threshold, threshold + math.ceil(max(refined_operator_usage_timeline)), 5))
 
     handles, _ = scatter.legend_elements()
 
     legend = ax.legend(
         handles=handles,
-        labels=unique_ops,
+        labels=refined_unique_ops,
         loc='best',
         title='Operators'
     )
@@ -251,7 +274,7 @@ if histogram_dict1 and histogram_dict2:
 
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
-                 '(on-chip memory) with no NPU cache\n', fontweight='bold')
+                 '(on-chip memory) with no NPU cache\n\nMaximum Operator Memory: {} MB\n\n'.format(max_operator_memory), fontweight='bold')
 
     ax.set_title('Memory Size of Operators (> {} MB)'.format(threshold))
     
