@@ -8,18 +8,18 @@ ADD_MAC = 1
 MUL_MAC = 1
 MUL_ADD_MAC = 1
 CMP_MAC = 1
-DIV_MAC = 4
-SQRT_MAC = 4
-LOG_MAC = 4
-EXP_MAC = 8
-TRIG_MAC = 8
+DIV_MAC = 2
+SQRT_MAC = 2
+LOG_MAC = 2
+EXP_MAC = 4
+TRIG_MAC = 4
 
 # dict of ONNX Operators
 OPERATORS = {
     'OPERATOR': [{'MACS': 0}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'ADD': [{'MACS': ADD_MAC}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'AND': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
-    'BATCHNORMALIZATION': [{'MACS': 2*ADD_MAC + MUL_MAC + DIV_MAC + SQRT_MAC}, {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'BATCHNORMALIZATION': [{'MACS': ADD_MAC + MUL_ADD_MAC + DIV_MAC + SQRT_MAC}, {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'CAST': [{'MACS': CMP_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
     'CONCAT': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
     'CONSTANT': [{'MACS': MEM_MAC}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
