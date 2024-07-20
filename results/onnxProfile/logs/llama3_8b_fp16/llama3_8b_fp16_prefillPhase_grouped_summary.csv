@@ -1,4 +1,4 @@
-Operator,Count,Count (%),Number of Params,Params (%),Memory (in Bytes),Memory (%),Operations,Operations (%),Average Compute-to-Memory Ratio (Operations/Byte),Weights and Bias Memory (in Bytes),Weights and Bias Memory (%),Output Memory (in Bytes),Output Memory (%)
+Operator,Count,Count (%),Number of Params,Params (%),Memory (in Bytes),Memory (%),Compute Operations,Compute Operations (%),Average Compute-to-Memory Ratio (Operations/Byte),Weights and Bias Memory (in Bytes),Weights and Bias Memory (%),Output Memory (in Bytes),Output Memory (%)
 Add,229.0,3.15,0.0,0.0,3038914568.0,7.948,1513162753.0,0.0,0.493,0.0,0.0,3038914568.0,7.948
 And,1.0,0.014,0.0,0.0,2097152.0,0.005,2097152.0,0.0,1.0,0.0,0.0,2097152.0,0.005
 Cast,3.0,0.041,0.0,0.0,4200448.0,0.011,2100224.0,0.0,0.5,0.0,0.0,4200448.0,0.011

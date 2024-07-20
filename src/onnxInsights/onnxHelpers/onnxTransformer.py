@@ -463,7 +463,7 @@ class ONNXTransformer:
     def summarize(
             self
     ) -> None:
-        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'Operations', 'Inputs Shape', 'Output Shape',
+        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'Compute Operations', 'Inputs Shape', 'Output Shape',
                                               'Weights and Bias Shape', 'Inputs Size', 'Weights and Bias Size', 'Output Size',
                                               'Inputs Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
                                               'Output Memory (in Bytes)'])
@@ -487,7 +487,7 @@ class ONNXTransformer:
         
         # type-cast
         dataframe['Number of Params'] = dataframe['Number of Params'].astype('int64')
-        dataframe['Operations'] = dataframe['Operations'].astype('int64')
+        dataframe['Compute Operations'] = dataframe['Compute Operations'].astype('int64')
         dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype('int64')
         dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype('int64')
         dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
@@ -502,10 +502,10 @@ class ONNXTransformer:
         dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
 
         # operations percent
-        dataframe.insert(7, 'Operations (%)', ((dataframe['Operations'] * 100.0).astype('float64') / dataframe['Operations'].sum()).astype('float64').round(3))
+        dataframe.insert(7, 'Compute Operations (%)', ((dataframe['Compute Operations'] * 100.0).astype('float64') / dataframe['Compute Operations'].sum()).astype('float64').round(3))
         
         # compute-to-memory percent
-        dataframe.insert(8, 'Compute-to-Memory Ratio (Operations/Byte)', ((dataframe['Operations']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
+        dataframe.insert(8, 'Compute-to-Memory Ratio (Operations/Byte)', ((dataframe['Compute Operations']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
         
         # memory percent
         dataframe.insert(9, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
@@ -527,8 +527,8 @@ class ONNXTransformer:
         dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False, mode='w')
 
         # grouping by operator
-        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)', 'Operations',
-                                       'Operations (%)', 'Compute-to-Memory Ratio (Operations/Byte)', 'Weights and Bias Memory (in Bytes)',
+        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)', 'Compute Operations',
+                                       'Compute Operations (%)', 'Compute-to-Memory Ratio (Operations/Byte)', 'Weights and Bias Memory (in Bytes)',
                                        'Weights and Bias Memory (%)', 'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
 
         # operator count and percent
