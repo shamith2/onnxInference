@@ -12,6 +12,8 @@ MUL_ADD_MACS = 1
 
 # Vector Engine
 CMP_OPS = 1
+V_ADD_FLOPS = 1
+V_MUL_FLOPS = 1
 DIV_FLOPS = 1
 SQRT_FLOPS = 1
 LOG_FLOPS = 1
@@ -23,7 +25,7 @@ OPERATORS = {
     'OPERATOR': [{'OPS': 0}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'ADD': [{'OPS': ADD_MACS}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'AND': [{'OPS': CMP_OPS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
-    'BATCHNORMALIZATION': [{'OPS': ADD_MACS + MUL_ADD_MACS + DIV_FLOPS + SQRT_FLOPS}, {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'BATCHNORMALIZATION': [{'OPS': 2*V_ADD_FLOPS + V_MUL_FLOPS + DIV_FLOPS + SQRT_FLOPS}, {'ADD': 2, 'MUL': 1, 'DIV': 1, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'CAST': [{'OPS': CMP_OPS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
     'CONCAT': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
     'CONSTANT': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
@@ -40,15 +42,15 @@ OPERATORS = {
     'MUL': [{'OPS': MUL_ADD_MACS}, {'ADD': 1, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'NEG': [{'OPS': MUL_MACS}, {'ADD': 0, 'MUL': 1, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'POW': [{'OPS': EXP_FLOPS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
-    'RANGE': [{'OPS': ADD_MACS + 2*CMP_OPS}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 2, 'TRIG': 0, 'MEM': 0}],
+    'RANGE': [{'OPS': V_ADD_FLOPS + 2*CMP_OPS}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 2, 'TRIG': 0, 'MEM': 0}],
     'REDUCEMEAN': [{'OPS': ADD_MACS}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'RESHAPE': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
     'SCATTERND': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
     'SHAPE': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
-    'SIGMOID': [{'OPS': MUL_ADD_MACS + EXP_FLOPS + DIV_FLOPS}, {'ADD': 1, 'MUL': 1, 'DIV': 1, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'SIGMOID': [{'OPS': V_ADD_FLOPS + V_MUL_FLOPS + EXP_FLOPS + DIV_FLOPS}, {'ADD': 1, 'MUL': 1, 'DIV': 1, 'EXP': 1, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'SIN': [{'OPS': TRIG_FLOPS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 1, 'MEM': 0}],
     'SLICE': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
-    'SOFTMAX': [{'OPS': ADD_MACS + 2*EXP_FLOPS}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 2, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
+    'SOFTMAX': [{'OPS': V_ADD_FLOPS + 2*EXP_FLOPS}, {'ADD': 1, 'MUL': 0, 'DIV': 0, 'EXP': 2, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'SQRT': [{'OPS': SQRT_FLOPS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 1, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 0}],
     'TRANSPOSE': [{'OPS': MEM_MACS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 0, 'TRIG': 0, 'MEM': 1}],
     'TRILU': [{'OPS': CMP_OPS}, {'ADD': 0, 'MUL': 0, 'DIV': 0, 'EXP': 0, 'SQRT': 0, 'LOG': 0, 'CMP': 1, 'TRIG': 0, 'MEM': 0}],
