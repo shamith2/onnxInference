@@ -286,7 +286,7 @@ class ONNXTransformer:
         return tensor_dict, weight_dict
     
 
-    def getMemoryandMacInfo(
+    def getMemoryandComputeInfo(
             self
     ) -> None:
         def _get_memory_info(node_param_dict):
@@ -450,7 +450,7 @@ class ONNXTransformer:
                 del self.count_operators[op]
 
         # params size and memory size for inputs and outputs
-        self.getMemoryandMacInfo()
+        self.getMemoryandComputeInfo()
 
         # summarize
         self.summarize()
