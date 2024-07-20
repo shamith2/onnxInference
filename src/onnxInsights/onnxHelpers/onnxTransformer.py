@@ -324,7 +324,7 @@ class ONNXTransformer:
             op_type = self.valid_nodes_list[name_of_nodes.index(node)][1].upper()
 
             if wb_param_size == 0:
-                self.op_macs_dict[node] = ((self.output_params_dict[node][0][0] * OPERATORS[op_type][0]['MACS'],),)
+                self.op_macs_dict[node] = ((self.output_params_dict[node][0][0] * OPERATORS[op_type][0]['OPS'],),)
 
             else:
                 # matmul = (b, m, n) * (b, n, p) -> (b, m, p)
@@ -332,17 +332,17 @@ class ONNXTransformer:
                     # multiply_const = numpy.prod(self.node_input_dict[node][1][0], dtype=numpy.int64) * self.node_wb_dict[node][1][0][-1]
                     multiply_const = self.input_params_dict[node][0][0] * self.node_wb_dict[node][1][0][-1]
 
-                    self.op_macs_dict[node] = ((multiply_const * OPERATORS[op_type][0]['MACS'],),)
+                    self.op_macs_dict[node] = ((multiply_const * OPERATORS[op_type][0]['OPS'],),)
 
                 # mul = (b, m, n) * (n,) -> (b, m, n)
                 elif op_type == 'MUL':                    
                     # multiply_const = numpy.prod(self.node_input_dict[node][1][0], dtype=numpy.int64)
                     multiply_const = self.input_params_dict[node][0][0]
                     
-                    self.op_macs_dict[node] = ((multiply_const * OPERATORS[op_type][0]['MACS'],),)
+                    self.op_macs_dict[node] = ((multiply_const * OPERATORS[op_type][0]['OPS'],),)
                 
                 else:
-                    self.op_macs_dict[node] = ((self.output_params_dict[node][0][0] * OPERATORS[op_type][0]['MACS'],),)
+                    self.op_macs_dict[node] = ((self.output_params_dict[node][0][0] * OPERATORS[op_type][0]['OPS'],),)
 
 
     def profileModel(
@@ -463,7 +463,7 @@ class ONNXTransformer:
     def summarize(
             self
     ) -> None:
-        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'MACS', 'Inputs Shape', 'Output Shape',
+        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'OPERATIONS', 'Inputs Shape', 'Output Shape',
                                               'Weights and Bias Shape', 'Inputs Size', 'Weights and Bias Size', 'Output Size',
                                               'Inputs Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
                                               'Output Memory (in Bytes)'])
@@ -487,7 +487,7 @@ class ONNXTransformer:
         
         # type-cast
         dataframe['Number of Params'] = dataframe['Number of Params'].astype('int64')
-        dataframe['MACS'] = dataframe['MACS'].astype('int64')
+        dataframe['OPERATIONS'] = dataframe['OPERATIONS'].astype('int64')
         dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype('int64')
         dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype('int64')
         dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
@@ -502,10 +502,10 @@ class ONNXTransformer:
         dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
 
         # operator macs percent
-        dataframe.insert(7, 'MACS (%)', ((dataframe['MACS'] * 100.0).astype('float64') / dataframe['MACS'].sum()).astype('float64').round(3))
+        dataframe.insert(7, 'MACS (%)', ((dataframe['OPERATIONS'] * 100.0).astype('float64') / dataframe['OPERATIONS'].sum()).astype('float64').round(3))
         
         # compute-to-memory percent
-        dataframe.insert(8, 'Compute-to-Memory Ratio (MACS/Byte)', ((dataframe['MACS']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
+        dataframe.insert(8, 'Compute-to-Memory Ratio (MACS/Byte)', ((dataframe['OPERATIONS']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
         
         # memory percent
         dataframe.insert(9, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
@@ -527,7 +527,7 @@ class ONNXTransformer:
         dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False, mode='w')
 
         # grouping by operator
-        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)', 'MACS',
+        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)', 'OPERATIONS',
                                        'MACS (%)', 'Compute-to-Memory Ratio (MACS/Byte)', 'Weights and Bias Memory (in Bytes)',
                                        'Weights and Bias Memory (%)', 'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
 
