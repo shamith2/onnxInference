@@ -18,10 +18,11 @@ try:
     model_name = sys.argv[1]
     metadata = sys.argv[2]
     filename = sys.argv[3]
-    threshold = int(sys.argv[4])
+    memory_threshold = int(sys.argv[4])
+    outlier_threshold = int(sys.argv[5])
 
 except IndexError:
-    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [metadata] [analysis csv filename] [size of NPU on-chip memory in MB]")
+    raise Exception("[Usage] > python onnx_profiling_analysis.py [name of the model being analysed] [metadata] [analysis csv filename] [size of NPU on-chip memory in MB] [outlier threshold]")
 
 model_dir = '_'.join(model_name.lower().split(' '))
 filepath = os.path.join(root, 'results', 'onnxProfile', 'logs', model_dir, filename + '_summary.csv')
@@ -43,7 +44,7 @@ histogram_dict1 = {}
 histogram_dict2 = {}
 
 
-def getDictKey(element, threshold):
+def getDictKey(element, memory_threshold):
     ceil_elem = math.ceil(element)
 
     if ceil_elem == 0:
@@ -52,8 +53,8 @@ def getDictKey(element, threshold):
     if ceil_elem == 1:
         return '1', '(0,1]'
     
-    elif element > float(threshold):
-        return str(ceil_elem), '>' + str(threshold)
+    elif element > float(memory_threshold):
+        return str(ceil_elem), '>' + str(memory_threshold)
 
     else:
         return str(ceil_elem), '(' + str(ceil_elem - 1) + ',' + str(ceil_elem) + ']'
@@ -61,12 +62,12 @@ def getDictKey(element, threshold):
 
 # optimize operators having consecutive same output memory size
 for i, element in enumerate(total_memory):
-    key = getDictKey(element, threshold)
+    key = getDictKey(element, memory_threshold)
 
     if optimized_memory_usage.get(key, None) is None:
         optimized_memory_usage[key] = [1, (element,)]
 
-        if element > float(threshold):
+        if element > float(memory_threshold):
             optimized_operator_timeline += (operators[i],)
             optimized_operator_usage_timeline += (element,)
     
@@ -75,7 +76,7 @@ for i, element in enumerate(total_memory):
             optimized_memory_usage[key][0] += 1
             optimized_memory_usage[key][1] += (element,)
             
-            if element > float(threshold):
+            if element > float(memory_threshold):
                 optimized_operator_timeline += (operators[i],)
                 optimized_operator_usage_timeline += (element,)
 
@@ -92,8 +93,8 @@ def sortDict(dictionary):
 
 optimized_memory_usage = sortDict(optimized_memory_usage)
 
-if threshold:
-    threshold_key = '>' + str(threshold)
+if memory_threshold:
+    threshold_key = '>' + str(memory_threshold)
 
     for element in optimized_memory_usage:
         if element[1] != threshold_key:
@@ -147,7 +148,7 @@ if histogram_dict1 and histogram_dict2:
             plot_weighed_keys.append(keys[j])
             plot_weighed_values.append(weighed_values[j])
 
-    threshold_key = '>' + str(threshold)
+    threshold_key = '>' + str(memory_threshold)
     identifier_idx1 = plot_keys.index(threshold_key)
     identifier_idx2 = plot_weighed_keys.index(threshold_key)
 
@@ -197,7 +198,7 @@ if histogram_dict1 and histogram_dict2:
 
     # set title
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
-                 'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
+                 'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(memory_threshold) + 
                  '(on-chip memory) with no NPU cache\n\n', fontweight='bold')
     
     ax1.set_title('Breakdown based on Count')
@@ -205,7 +206,7 @@ if histogram_dict1 and histogram_dict2:
 
     plt.tight_layout()
 
-    fig.savefig(os.path.join(save_directory, model_dir + '_' + metadata + '_' + str(threshold) + 'mb_' + 'pie_plot.png'))
+    fig.savefig(os.path.join(save_directory, model_dir + '_' + metadata + '_' + str(memory_threshold) + 'mb_' + 'pie_plot.png'))
 
     plt.close(fig)
 
@@ -213,29 +214,37 @@ if histogram_dict1 and histogram_dict2:
     num_unique_ops = len(unique_ops)
 
     operator_memory_list = [int(key[0]) for key in optimized_memory_usage.keys()]
+    operator_memory_dict = {int(key[0]): int(val[0]) for key, val in optimized_memory_usage.items()}
 
     max_operator_memory = max(operator_memory_list)
 
-    # adapted from https://stackoverflow.com/questions/62802061/python-find-outliers-inside-a-list
-    def find_outliers(data: list, m: int = 7):
-        data = numpy.asarray(data)
-        d = numpy.abs(data - numpy.median(data))
-        median_d = numpy.median(d)
-        std_dev = d / (median_d if median_d else 1.0)
+    def find_outliers(data_dict: dict, outlier_threshold: int = 0) -> list:
+        dict_keys, dict_values = list(data_dict.keys()), list(data_dict.values())
+        sorted_value_index = numpy.argsort(dict_values)
+        sorted_dict = {dict_keys[i]: dict_values[i] for i in sorted_value_index}
+
+        outlier_keys = list(sorted_dict.keys())[:outlier_threshold]
+
+        _op_memory_list = []
+
+        for key in dict_keys:
+            if key not in outlier_keys:
+                _op_memory_list.append(key)
         
-        return data[numpy.nonzero(std_dev > m)]
+        return _op_memory_list
+
+    print("dict[Operator Memory Size (in MB): Operator Count] = {}\n".format(operator_memory_dict))
 
     # find and remove outliers while plotting operators' memory values
-    outlier_list = find_outliers(operator_memory_list)
+    non_outlier_list = find_outliers(operator_memory_dict, outlier_threshold)
 
     refined_operator_timeline = ()
     refined_operator_usage_timeline = ()
 
-    for outlier in outlier_list:
-        for i, elem in enumerate(optimized_operator_usage_timeline):
-            if math.ceil(elem) < outlier:
-                refined_operator_timeline += (optimized_operator_timeline[i],)
-                refined_operator_usage_timeline += (optimized_operator_usage_timeline[i],)
+    for i, elem in enumerate(optimized_operator_usage_timeline):
+        if math.ceil(elem) in non_outlier_list:
+            refined_operator_timeline += (optimized_operator_timeline[i],)
+            refined_operator_usage_timeline += (optimized_operator_usage_timeline[i],)
 
     plot_ops = []
     refined_unique_ops = list(set(refined_operator_timeline))
@@ -255,7 +264,7 @@ if histogram_dict1 and histogram_dict2:
 
     # set axes labels and title
     ax.set_xticks(x)
-    ax.set_yticks(range(threshold, threshold + math.ceil(max(refined_operator_usage_timeline)), 5))
+    ax.set_yticks(range(memory_threshold, memory_threshold + math.ceil(max(refined_operator_usage_timeline)), 5))
 
     handles, _ = scatter.legend_elements()
 
@@ -274,13 +283,13 @@ if histogram_dict1 and histogram_dict2:
     plt.tick_params(bottom=True, labelbottom=False)
 
     fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
-                 'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(threshold) + 
+                 'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(memory_threshold) + 
                  '(on-chip memory) with no NPU cache\n\nMaximum Operator Memory: {} MB\n\n'.format(max_operator_memory), fontweight='bold')
 
-    ax.set_title('Memory Size of Operators (> {} MB)'.format(threshold))
+    ax.set_title('Memory Size of Operators (> {} MB)'.format(memory_threshold))
     
     plt.tight_layout()
 
-    fig.savefig(os.path.join(save_directory, model_dir + '_' + metadata + '_' + str(threshold) + 'mb_' + 'operators_plot.png'))
+    fig.savefig(os.path.join(save_directory, model_dir + '_' + metadata + '_' + str(memory_threshold) + 'mb_' + 'operators_plot.png'))
 
     plt.close(fig)
