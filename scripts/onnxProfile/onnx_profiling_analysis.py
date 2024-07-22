@@ -35,7 +35,7 @@ table = pandas.read_csv(filepath)
 
 operators = table['Operator']
 output_memory_bytes = table['Output Memory (in Bytes)'][:-1].to_numpy(dtype=numpy.int64)
-total_memory = table['Memory (in MB)'][:-1].to_numpy(dtype=numpy.float64)
+total_memory = (table['Weights and Bias Memory (in MB)'] * 1.0 + table['Output Memory (in MB)'] * 1.0)[:-1].to_numpy(dtype=numpy.float64)
 
 optimized_memory_usage = {}
 optimized_operator_timeline = ()
@@ -197,7 +197,7 @@ if histogram_dict1 and histogram_dict2:
     plt.setp(pcts2, size=14, color='white', fontweight='bold')
 
     # set title
-    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
+    fig.suptitle('{}\n\nShould FP16 Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(memory_threshold) + 
                  '(on-chip memory) with no NPU cache\n\n', fontweight='bold')
     
@@ -282,7 +282,7 @@ if histogram_dict1 and histogram_dict2:
 
     plt.tick_params(bottom=True, labelbottom=False)
 
-    fig.suptitle('{}\n\nShould Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache'.format(model_name) + 
+    fig.suptitle('{}\n\nShould FP16 Weights + Output of an Operator\nbe stored in Main Memory or Last-level cache '.format(model_name) + 
                  'during single inference?\n\nIf memory size of the Operator > {} MB\n'.format(memory_threshold) + 
                  '(on-chip memory) with no NPU cache\n\nMaximum Operator Memory: {} MB\n\n'.format(max_operator_memory), fontweight='bold')
 
