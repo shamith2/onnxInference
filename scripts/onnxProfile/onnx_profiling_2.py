@@ -38,7 +38,7 @@ def get_shapes(model_path):
 # inferred_onnx_model_path = onnx_t.shapeInfer('sdxlt_unet', uninferred_onnx_model_path, [(1, 4, 64, 64), (1,), (1, 77, 2048), (1, 1280), (1, 6)], [(1, 4, 64, 64)])
 
 # for llm: llama
-PHASE = 'DECODE'
+PHASE = 'DECODEN'
 BATCH_SIZE = 1
 SEQ_LEN = 1024 if PHASE == 'PREFILL' else 1
 MAX_LEN = 2048

@@ -452,34 +452,12 @@ class ONNXTransformer:
         # optimize operators by memory
         self.optimizeOperatorsbyMemory()
 
+        # grouped summary
+        self.groupedSummary()
+
         logging.info("Profiling logs stored in directory: {}".format(self.profile_logs_directory))
 
         return 0
-
-
-    def _grouped_summary(
-            self,
-            dataframe: pandas.DataFrame
-    ) -> pandas.DataFrame:
-        # grouping by operator
-        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Memory (in Bytes)', 'Memory (%)', 'Compute Operations',
-                                       'Compute Operations (%)', 'Compute-to-Memory Ratio (Operations/Byte)', 'Weights and Bias Memory (in Bytes)',
-                                       'Weights and Bias Memory (%)', 'Output Memory (in Bytes)', 'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
-
-        # operator count and percent
-        grouped_dataframe.insert(1, 'Count', list(dataframe.groupby('Operator').size()))
-        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100.0).astype('float64') / grouped_dataframe['Count'].sum()).astype('float64').round(3))
-
-        grouped_dataframe.insert(9, 'Average Compute-to-Memory Ratio (Operations/Byte)', ((grouped_dataframe['Compute-to-Memory Ratio (Operations/Byte)']).astype('float64') / grouped_dataframe['Count']).astype('float64').round(3))
-        
-        grouped_dataframe = grouped_dataframe.drop(['Compute-to-Memory Ratio (Operations/Byte)'], axis=1)
-
-        # total
-        grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True).round(0)
-
-        grouped_dataframe = grouped_dataframe.round(3)
-
-        return grouped_dataframe
 
 
     def summarize(
@@ -548,10 +526,6 @@ class ONNXTransformer:
 
         dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False, mode='w')
 
-        grouped_dataframe = self._grouped_summary(dataframe)
-
-        grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False, mode='w')
-
         
     def optimizeOperatorsbyMemory(
             self
@@ -571,9 +545,41 @@ class ONNXTransformer:
 
         optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'), index=False, mode='w')
 
-        grouped_optim_dataframe = self._grouped_summary(optim_dataframe)
 
-        grouped_optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_memory_optimized_summary.csv'), index=False, mode='w')
+    def groupedSummary(
+            self
+    ) -> None:
+        dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'))
+        optim_dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'))
+
+        # grouping by operator
+        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)', 'Compute Operations',
+                                       'Compute Operations (%)']].groupby(['Operator'], as_index=False).sum()
+        
+        optim_grouped_dataframe = optim_dataframe[['Operator', 'Memory (in Bytes)', 'Memory (%)', 'Weights and Bias Memory (in Bytes)',
+                                                   'Weights and Bias Memory (%)', 'Output Memory (in Bytes)',
+                                                   'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
+
+        grouped_dataframe = grouped_dataframe.merge(optim_grouped_dataframe, on='Operator', how='outer')
+
+        # operator count and percent
+        grouped_dataframe.insert(1, 'Count', list(dataframe.groupby('Operator').size()))
+        grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100.0).astype('float64') / grouped_dataframe['Count'].sum()).astype('float64').round(3))
+
+        # memory optimized operator count and percent
+        grouped_dataframe.insert(3, 'Optimized Count', pandas.Series(list(optim_dataframe.groupby('Operator').size())))
+        grouped_dataframe.insert(4, 'Optimized Count (%)', ((grouped_dataframe['Optimized Count'] * 100.0).astype('float64') / grouped_dataframe['Optimized Count'].sum()).astype('float64').round(3))
+
+        grouped_dataframe.insert(9, 'Average Compute-to-Memory Ratio (Operations/Byte)', ((grouped_dataframe['Compute Operations']).astype('float64') / grouped_dataframe['Memory (in Bytes)']).astype('float64').round(3))
+
+        # total
+        grouped_dataframe.loc['Total'] = grouped_dataframe.sum(numeric_only=True).round(0)
+
+        grouped_dataframe = grouped_dataframe.round(3)
+
+        # grouped_dataframe = grouped_dataframe.fillna(0)
+
+        grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False, mode='w')
 
 
     def profileModelonCPU(
