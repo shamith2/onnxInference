@@ -537,11 +537,14 @@ class ONNXTransformer:
 
         # optimize operators having consecutive same output memory size
         for idx, _ in dataframe.iterrows():
-            if idx < dataframe.shape[0] - 2: # last row contains total
+            if idx < dataframe.shape[0] - 2: # ignore last row since it contains totals
                 # additional logic for redundancy
                 if (int(dataframe.iloc[idx + 1]['Inputs Size']) != int(dataframe.iloc[idx]['Output Size'])) \
                 and (int(dataframe.iloc[idx + 1]['Inputs Memory (in Bytes)']) != int(dataframe.iloc[idx]['Output Memory (in Bytes)'])):
                     optim_dataframe = pandas.concat([optim_dataframe, pandas.DataFrame([dataframe.iloc[idx + 1]])], ignore_index=True)
+
+        # total
+        optim_dataframe.loc['Total'] = optim_dataframe.sum(numeric_only=True).round(0)
 
         optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'), index=False, mode='w')
 
