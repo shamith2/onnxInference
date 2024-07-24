@@ -116,18 +116,20 @@ def _convert_shape_tuple_to_string(
 class ONNXTransformer:
     def __init__(
             self,
-            model_name: str
+            model_name: str,
+            model_dir: str
     ):
         self.extension = '.onnx'
 
         self.root = Path(__file__).parents[3].resolve()
         self.workspace = Path(__file__).parent.resolve()
 
-        model_name = '_'.join(model_name.split(' ')).lower()
+        self.model_name = model_name
+        model_dir = '_'.join(model_dir.split(' ')).lower()
 
         self.prof_directory = os.path.join(self.root, 'results', 'onnxProfile')
-        self.infer_model_directory = os.path.join(self.prof_directory, 'models', model_name)
-        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_name)
+        self.infer_model_directory = os.path.join(self.prof_directory, 'models', model_dir)
+        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir)
 
         for p in [self.prof_directory, self.infer_model_directory, self.profile_logs_directory]:
             if not os.path.exists(p):
@@ -226,13 +228,10 @@ class ONNXTransformer:
 
     def shapeInfer(
             self,
-            model_name: str,
             onnx_model_file: str,
             static_input_dims: list,
             static_output_dims: list
     ) -> str:
-        self.model_name = model_name
-
         intermediate_model_file = self._verify_inputs_and_outputs(onnx_model_file, static_input_dims, static_output_dims)
 
         logger.info("Performing symbolic shape inference")
@@ -455,6 +454,9 @@ class ONNXTransformer:
         # summarize
         self.summarize()
 
+        # optimize operators by memory
+        self.optimizeOperatorsbyMemory()
+
         logging.info("Profiling logs stored in directory: {}".format(self.profile_logs_directory))
 
         return 0
@@ -545,6 +547,25 @@ class ONNXTransformer:
         grouped_dataframe = grouped_dataframe.round(3)
 
         grouped_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_grouped_summary.csv'), index=False, mode='w')
+
+
+    def optimizeOperatorsbyMemory(
+            self
+    ) -> None:
+        dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'))
+
+        optim_dataframe = pandas.DataFrame(columns=dataframe.columns)
+        optim_dataframe = pandas.concat([optim_dataframe, pandas.DataFrame([dataframe.iloc[0]])], ignore_index=True)
+
+        # optimize operators having consecutive same output memory size
+        for idx, _ in dataframe.iterrows():
+            if idx < dataframe.shape[0] - 2: # last row contains total
+                # additional logic for redundancy
+                if (int(dataframe.iloc[idx + 1]['Inputs Size']) != int(dataframe.iloc[idx]['Output Size'])) \
+                and (int(dataframe.iloc[idx + 1]['Inputs Memory (in Bytes)']) != int(dataframe.iloc[idx]['Output Memory (in Bytes)'])):
+                    optim_dataframe = pandas.concat([optim_dataframe, pandas.DataFrame([dataframe.iloc[idx + 1]])], ignore_index=True)
+
+        optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'), index=False, mode='w')
 
 
     def profileModelonCPU(

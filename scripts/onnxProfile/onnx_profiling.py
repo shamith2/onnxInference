@@ -46,7 +46,10 @@ SEQ_LEN = 1024 if PHASE == 'PROMPT' else 1
 MAX_LEN = 2048
 CACHE_LEN = 1 if PHASE == 'PROMPT' else MAX_LEN - 1
 
-onnx_t = ONNXTransformer(model_name='tinyllama')
+onnx_t = ONNXTransformer(
+    model_name='tinyllama',
+    model_dir='tinyllama'
+)
 
 uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'model_quantized.onnx')
 
@@ -63,7 +66,6 @@ for i in range(22):
     output_shapes.append((BATCH_SIZE, 4, MAX_LEN, 64)) # for value
 
 inferred_onnx_model_path = onnx_t.shapeInfer(
-    'tinyllama',
     uninferred_llm_onnx_model_path,
     input_shapes,
     output_shapes
