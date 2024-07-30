@@ -8,11 +8,11 @@ import onnxruntime
 
 from pathlib import Path
 
-from onnxInsights.onnxHelpers import ONNXTransformer
+from onnxInsights.onnxHelpers import ONNXProfiler
 
 workspace = Path(__file__).parent.resolve()
 
-onnx_t = ONNXTransformer()
+onnx_t = ONNXProfiler()
 
 uninferred_onnx_model_path = os.path.join(workspace, 'models', 'model.onnx')
 
@@ -35,9 +35,9 @@ def get_shapes(model_path):
 
 # get_shapes(uninferred_onnx_model_path)
 
-# onnx_t = ONNXTransformer(model_name='sdxl_turbo_unet')
+# onnx_t = ONNXProfiler(model_name='sdxl_turbo_unet', model_dir='sdxlt_unet')
 
-# inferred_onnx_model_path = onnx_t.shapeInfer('sdxlt_unet', uninferred_onnx_model_path, [(1, 4, 64, 64), (1,), (1, 77, 2048), (1, 1280), (1, 6)], [(1, 4, 64, 64)])
+# inferred_onnx_model_path = onnx_t.shapeInfer(uninferred_onnx_model_path, [(1, 4, 64, 64), (1,), (1, 77, 2048), (1, 1280), (1, 6)], [(1, 4, 64, 64)])
 
 # for llm: tiny llama
 PHASE = 'TOKEN'
@@ -46,7 +46,7 @@ SEQ_LEN = 1024 if PHASE == 'PROMPT' else 1
 MAX_LEN = 2048
 CACHE_LEN = 1 if PHASE == 'PROMPT' else MAX_LEN - 1
 
-onnx_t = ONNXTransformer(
+onnx_t = ONNXProfiler(
     model_name='tinyllama',
     model_dir='tinyllama'
 )

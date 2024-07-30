@@ -18,6 +18,7 @@ from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
 from .onnxBenchmark import get_random_input
 from .onnxOPS import OPERATORS
 
+import json
 import pandas
 import logging
 
@@ -25,8 +26,8 @@ logging.basicConfig(level=logging.INFO)
 # logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-__producer__ = "onnxTransformer"
-__version__ = "0.3.1"
+__producer__ = "onnxProfiler"
+__version__ = "0.3.2"
 
 
 DTYPES = {
@@ -94,26 +95,36 @@ def checkandSaveModel(
 
 def _convert_shape_tuple_to_string(
         tuple_of_tuple: tuple[tuple[Any]],
-        add: bool = False
+        add: bool = False,
+        is_alpha: bool = False
 ) -> str:
     output = ''
 
-    for i, shape_tuple in enumerate(tuple_of_tuple):
-        output += 'x'.join(str(dim) for dim in shape_tuple)
+    if is_alpha and add:
+        logging.warning("is_alpha and add cannot be both True. Setting is_alpha to False")
+        is_alpha = False
 
-        if i < len(tuple_of_tuple) - 1:
-            output += ', '
+    if not is_alpha:
+        for i, shape_tuple in enumerate(tuple_of_tuple):
+            output += 'x'.join(str(dim) for dim in shape_tuple)
+
+            if i < len(tuple_of_tuple) - 1:
+                output += ' '
+    
+    else:
+        for name_tuple in tuple_of_tuple:
+            output += ' '.join(str(name) for name in name_tuple)
     
     param_sum = 0
 
     if add:
-        for out in output.split(', '):
+        for out in output.split(' '):
             param_sum += int(out)
     
     return param_sum if add else output
 
 
-class ONNXTransformer:
+class ONNXProfiler:
     def __init__(
             self,
             model_name: str,
@@ -229,9 +240,16 @@ class ONNXTransformer:
     def shapeInfer(
             self,
             onnx_model_file: str,
+            inferred_model_file: str,
             static_input_dims: list,
             static_output_dims: list
     ) -> str:
+        if not inferred_model_file:
+            _inferred_model_file = self.model_name + '_inferred'
+        
+        else:
+            _inferred_model_file = inferred_model_file
+
         intermediate_model_file = self._verify_inputs_and_outputs(onnx_model_file, static_input_dims, static_output_dims)
 
         logger.info("Performing symbolic shape inference")
@@ -244,9 +262,8 @@ class ONNXTransformer:
             verbose=0
         )
 
-        inferred_model_file = os.path.join(self.infer_model_directory, self.model_name + '_inferred' + self.extension)
-
-        assert checkandSaveModel(inferred_model, self.extension, self.infer_model_directory, self.model_name + '_inferred') == 0, "checkandSaveModel() failed"
+        assert checkandSaveModel(inferred_model, self.extension, self.infer_model_directory,
+                                 _inferred_model_file) == 0, "checkandSaveModel() failed"
 
         os.remove(intermediate_model_file)
 
@@ -256,7 +273,7 @@ class ONNXTransformer:
         except FileNotFoundError:
             pass
 
-        return inferred_model_file
+        return os.path.join(self.infer_model_directory, _inferred_model_file + self.extension)
 
 
     def updateTensorandWeightDict(
@@ -289,30 +306,32 @@ class ONNXTransformer:
             self
     ) -> None:
         def _get_memory_info(node_param_dict):
+            names_dict = {}
             params_dict = {}
             memory_dict = {}
 
             for node in node_param_dict:
-                name, shape, size = node_param_dict[node]
-                count = len(name)
+                name_tuple, shape_tuple, size_tuple = node_param_dict[node]
+                count = len(name_tuple)
 
                 params_size = ()
                 memory_size = ()
 
                 for i in range(count):
-                    param_size = numpy.prod(shape[i], dtype=numpy.int64)
+                    param_size = numpy.prod(shape_tuple[i], dtype=numpy.int64)
 
                     params_size += ((param_size.item(),),)
-                    memory_size += (((param_size * size[i]).item(),),)
+                    memory_size += (((param_size * size_tuple[i]).item(),),)
 
+                names_dict[node] = (name_tuple,) if name_tuple else (('',),)
                 params_dict[node] = params_size if params_size else ((0,),)
                 memory_dict[node] = memory_size if memory_size else ((0,),)
 
-            return params_dict, memory_dict
+            return names_dict, params_dict, memory_dict
 
-        self.input_params_dict, self.input_memory_dict = _get_memory_info(self.node_input_dict)
-        self.wb_params_dict, self.wb_memory_dict = _get_memory_info(self.node_wb_dict)
-        self.output_params_dict, self.output_memory_dict = _get_memory_info(self.node_output_dict)
+        self.input_names_dict, self.input_params_dict, self.input_memory_dict = _get_memory_info(self.node_input_dict)
+        self.wb_names_dict, self.wb_params_dict, self.wb_memory_dict = _get_memory_info(self.node_wb_dict)
+        self.output_names_dict, self.output_params_dict, self.output_memory_dict = _get_memory_info(self.node_output_dict)
 
         self.op_macs_dict = {}
 
@@ -366,82 +385,60 @@ class ONNXTransformer:
         # list of onnx.TensorProto
         self.model_weights = graph.initializer
 
-        # operator and tensor dicts
-        self.unsorted_count_operators = {}
-
         # tensor dict and weights-bias dict
         self.tensor_dict, self.wb_dict = self.updateTensorandWeightDict(self.inputs, self.outputs, graph.value_info, self.model_weights)
 
-        for i, node in enumerate(self.nodes):
-            node_input_list = []
-            node_wb_list = []
-            node_output_list = []
-
+        for node in self.nodes:
+            input_names = ()
             input_shapes = ()
             input_size = ()
 
+            wb_names = ()
             wb_shapes = ()
             wb_size = ()
 
+            output_names = ()
             output_shapes = ()
             output_size = ()
 
             # parse onnx gragh for inputs and weight data
-            for i, node_input in enumerate(node.input):
+            for node_input in node.input:
                 if node_input:
                     if node_input in self.wb_dict.keys():
                         wb_shape = self.wb_dict[node_input]['shape']
 
                         if wb_shape:
+                            wb_names += (node_input,)
                             wb_shapes += (wb_shape,)
                             wb_size += (self.wb_dict[node_input]['size'],)
-
-                            node_wb_list.append(node_input)
                     
                     else:
                         input_shape = self.tensor_dict[node_input]['shape']
 
                         if input_shape:
+                            input_names += (node_input,)
                             input_shapes += (input_shape,)
                             input_size += (self.tensor_dict[node_input]['size'],)
 
-                            node_input_list.append(node_input)
-
-            self.node_input_dict[node.name] = (tuple(node_input_list), input_shapes, input_size)
+            self.node_input_dict[node.name] = (input_names, input_shapes, input_size)
             
-            self.node_wb_dict[node.name] = (tuple(node_wb_list), wb_shapes, wb_size)
+            self.node_wb_dict[node.name] = (wb_names, wb_shapes, wb_size)
             
             # parse onnx gragh for outputs data
-            for i, node_output in enumerate(node.output):
+            for node_output in node.output:
                 output_shape = self.tensor_dict[node_output]['shape']
 
                 if output_shape:
+                    output_names += (node_output,)
                     output_shapes += (output_shape,)
                     output_size += (self.tensor_dict[node_output]['size'],)
-
-                    node_output_list.append(node_output)
             
-            if node_output_list:
-                self.node_output_dict[node.name] = (tuple(node_output_list), output_shapes, output_size)
+            if output_names:
+                self.node_output_dict[node.name] = (output_names, output_shapes, output_size)
 
             # is node does not have a valid output shape, node can be ignored
             else:
                 self.valid_nodes_list.remove((node.name, node.op_type))
-
-            
-            if self.unsorted_count_operators.get(node.op_type, None) is None:
-                self.unsorted_count_operators[node.op_type] = 1
-            
-            else:
-                self.unsorted_count_operators[node.op_type] += 1
-        
-
-        # sort based on operators, in alphabetical order
-        operators = list(self.unsorted_count_operators.keys())
-        operators.sort()
-
-        # remove operators not in self.valid_nodes_list
-        valid_ops = set([elem[1] for elem in self.valid_nodes_list])
 
         # params size and memory size for inputs and outputs
         self.getMemoryandComputeInfo()
@@ -449,11 +446,11 @@ class ONNXTransformer:
         # summarize
         self.summarize()
 
+        # track outputs
+        self.trackOutputs()
+
         # optimize operators by memory
         self.optimizeOperatorsbyMemory()
-
-        # grouped summary
-        self.groupedSummary()
 
         logging.info("Profiling logs stored in directory: {}".format(self.profile_logs_directory))
 
@@ -463,18 +460,23 @@ class ONNXTransformer:
     def summarize(
             self
     ) -> None:
-        dataframe = pandas.DataFrame(columns=['Node', 'Operator', 'Number of Params', 'Compute Operations', 'Inputs Shape', 'Output Shape',
-                                              'Weights and Bias Shape', 'Inputs Size', 'Weights and Bias Size', 'Output Size',
+        dataframe = pandas.DataFrame(columns=['Node', 'Inputs Name', 'Weights and Bias Name', 'Output Name', 'Operator',
+                                              'Number of Params', 'Compute Operations', 'Inputs Shape', 'Weights and Bias Shape',
+                                              'Output Shape', 'Inputs Size', 'Weights and Bias Size', 'Output Size',
                                               'Inputs Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
                                               'Output Memory (in Bytes)'])
 
         for node, op_type in self.valid_nodes_list:
-            row = pandas.DataFrame([[node, op_type,
+            row = pandas.DataFrame([[node,
+                                     _convert_shape_tuple_to_string(self.input_names_dict[node], is_alpha=True),
+                                     _convert_shape_tuple_to_string(self.wb_names_dict[node], is_alpha=True),
+                                     _convert_shape_tuple_to_string(self.output_names_dict[node], is_alpha=True),
+                                     op_type,
                                      _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.op_macs_dict[node]),
                                      _convert_shape_tuple_to_string(self.node_input_dict[node][1]),
-                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.node_wb_dict[node][1]),
+                                     _convert_shape_tuple_to_string(self.node_output_dict[node][1]),
                                      _convert_shape_tuple_to_string(self.input_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_params_dict[node], add=True),
@@ -493,45 +495,122 @@ class ONNXTransformer:
         dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
         
         # params percent
-        dataframe.insert(3, 'Params (%)', ((dataframe['Number of Params'] * 100.0).astype('float64') / dataframe['Number of Params'].sum()).astype('float64').round(3))
+        dataframe.insert(6, 'Params (%)', ((dataframe['Number of Params'] * 100.0).astype('float64') / dataframe['Number of Params'].sum()).astype('float64').round(3))
         
         # memory
-        dataframe.insert(4, 'Memory (in Bytes)', (dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)']).astype('int64'))
+        dataframe.insert(7, 'Memory (in Bytes)', (dataframe['Weights and Bias Memory (in Bytes)'] + dataframe['Output Memory (in Bytes)']).astype('int64'))
 
         # memory percent
-        dataframe.insert(5, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
+        dataframe.insert(8, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
+
+        # read and write memory
+        dataframe.insert(9, 'Read Memory (in Bytes)', (dataframe['Inputs Memory (in Bytes)'] + dataframe['Weights and Bias Memory (in Bytes)']).astype('int64'))
+        dataframe.insert(10, 'Write Memory (in Bytes)', dataframe['Output Memory (in Bytes)'])
 
         # operations percent
-        dataframe.insert(7, 'Compute Operations (%)', ((dataframe['Compute Operations'] * 100.0).astype('float64') / dataframe['Compute Operations'].sum()).astype('float64').round(3))
+        dataframe.insert(12, 'Compute Operations (%)', ((dataframe['Compute Operations'] * 100.0).astype('float64') / dataframe['Compute Operations'].sum()).astype('float64').round(3))
         
         # compute-to-memory percent
-        dataframe.insert(8, 'Compute-to-Memory Ratio (Operations/Byte)', ((dataframe['Compute Operations']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
+        dataframe.insert(13, 'Compute-to-Memory Ratio (Operations/Byte)', ((dataframe['Compute Operations']).astype('float64') / dataframe['Memory (in Bytes)']).astype('float64').round(3))
         
         # memory percent
-        dataframe.insert(9, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
+        dataframe.insert(14, 'Weights and Bias Memory (%)', ((dataframe['Weights and Bias Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
         
-        dataframe.insert(10, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100.0).astype('float64') / 
+        dataframe.insert(15, 'Output Memory (%)', ((dataframe['Output Memory (in Bytes)'] * 100.0).astype('float64') / 
                                                    (dataframe['Weights and Bias Memory (in Bytes)'].sum() + 
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
 
         # Memory in MB
+        dataframe['Inputs Memory (in MB)'] = (dataframe['Inputs Memory (in Bytes)'] / 1e6).astype('float64').round(6)
         dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(6)
         dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(6)
         dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('float64').round(6)
+        dataframe['Read Memory (in MB)'] = (dataframe['Inputs Memory (in MB)'] + dataframe['Weights and Bias Memory (in MB)']).astype('float64').round(6)
+        dataframe['Write Memory (in MB)'] = dataframe['Output Memory (in MB)']
 
         # total
         dataframe.loc['Total'] = dataframe.sum(numeric_only=True).round(0)
 
-        dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'), index=False, mode='w')
+        dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'),
+                         index=False, mode='w')
 
         self.groupedSummary(
             filename=self.model_name + '_grouped_summary.csv',
             optim_by_memory=False
         )
 
+
+    def trackOutputs(
+            self
+    ) -> None:
+        dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'))
+        track_outputs = {}
+
+        # this works because every operator has 1 output
+        # and the operators are in sequential order in the dataframe
+        for idx, _ in dataframe.iterrows():
+            if idx < dataframe.shape[0] - 1: # ignore last row since it contains totals
+                output_name = dataframe.at[idx, 'Output Name']
+                
+                if track_outputs.get(output_name, None) is None:
+                    track_outputs[output_name] = {}
+                    track_outputs[output_name]['Output Node Index'] = str(idx + 1)
+                    track_outputs[output_name]['Input Node Index'] = ''
+                    track_outputs[output_name]['Compute Operations'] = int(dataframe.at[idx, 'Compute Operations'])
+                    track_outputs[output_name]['Memory (in Bytes)'] = int(dataframe.at[idx, 'Output Memory (in Bytes)'])
+                    track_outputs[output_name]['Memory (in MB)'] = dataframe.at[idx, 'Output Memory (in MB)']
+
+        # track for each output entry in track_outputs, if it is an input to any operator
+        for output_name in track_outputs:
+            for idx, _ in dataframe.iterrows():
+                if idx < dataframe.shape[0] - 1: # ignore last row since it contains totals
+                    inputs_name = dataframe.at[idx, 'Inputs Name']
+                    
+                    if isinstance(inputs_name, str):
+                        inputs_list = inputs_name.split(' ')
+
+                        if output_name in inputs_list:
+                            if not track_outputs[output_name]['Input Node Index']:
+                                track_outputs[output_name]['Input Node Index'] += str(idx + 1)
+
+                            else:
+                                track_outputs[output_name]['Input Node Index'] += ' ' + str(idx + 1)
+
+        track_outputs = pandas.DataFrame.from_dict(track_outputs, orient='index')
+        track_outputs['Output Name'] = track_outputs.index
+
+        def _get_frequency(x):
+            input_node_indices = [int(elem) for elem in x.split(' ') if elem]
+            
+            return len(input_node_indices)
         
+        def _get_modified_range():
+            input_node_indices = track_outputs['Input Node Index']
+            output_node_indices = track_outputs['Output Node Index']
+            n_rows = len(output_node_indices)
+
+            # assert len(input_node_indices) == n_rows
+            range_list = [0] * n_rows
+            
+            for idx in range(n_rows):
+                index_list = [int(elem) for elem in input_node_indices.iloc[idx].split(' ') if elem]
+
+                if index_list:
+                    range_list[idx] = max(index_list) - int(output_node_indices.iloc[idx])
+            
+            return range_list
+
+        track_outputs.insert(2, 'Frequency', track_outputs['Input Node Index'].apply(lambda x: int(_get_frequency(x))))
+        track_outputs.insert(3, 'Cachability', _get_modified_range())
+
+        track_outputs = track_outputs[[track_outputs.columns[-1]] + track_outputs.columns[:-1].tolist()]
+
+        track_outputs.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_track_output_summary.csv'),
+                             index=False, mode='w')
+
+
     def optimizeOperatorsbyMemory(
             self
     ) -> None:
@@ -546,23 +625,45 @@ class ONNXTransformer:
         for idx, _ in dataframe.iterrows():
             if idx < dataframe.shape[0] - 2: # ignore last row since it contains totals
                 # additional logic for redundancy
-                if (int(dataframe.iloc[idx + 1]['Inputs Size']) == int(dataframe.iloc[idx]['Output Size'])) \
-                or (int(dataframe.iloc[idx + 1]['Inputs Memory (in Bytes)']) == int(dataframe.iloc[idx]['Output Memory (in Bytes)'])):
-                    for col in ['Weights and Bias Memory (in Bytes)', 'Output Memory (in Bytes)',
-                                'Memory (in Bytes)', 'Weights and Bias Memory (%)', 'Output Memory (%)',
-                                'Memory (%)', 'Weights and Bias Memory (in MB)', 'Output Memory (in MB)',
-                                'Memory (in MB)', 'Compute-to-Memory Ratio (Operations/Byte)']:
-                        optim_dataframe.at[idx + 1, col] = pandas.NA
+                # O1 (Operator Fusion): If a consecutive operator uses the output of its previous operator
+                # as its input, the operator does not need to read input from main/global memory, it can
+                # re-use the output of the previous operator either by caching or operator fusion
+                if (dataframe.at[idx + 1, 'Inputs Name'] == dataframe.at[idx, 'Output Name']) \
+                or (int(dataframe.at[idx + 1, 'Inputs Size']) == int(dataframe.at[idx, 'Output Size'])):
+                    optim_dataframe.at[idx + 1, 'Inputs Memory (in Bytes)'] = pandas.NA
+                    optim_dataframe.at[idx + 1, 'Inputs Memory (in MB)'] = pandas.NA
+
+                    # optim_dataframe.at[idx + 1, 'Read Memory (in Bytes)'] = dataframe.at[idx + 1, 'Weights and Bias Memory (in Bytes)']
+                    # optim_dataframe.at[idx + 1, 'Read Memory (in MB)'] = dataframe.at[idx + 1, 'Weights and Bias Memory (in MB)']
+
+
+                # O1-b
+                # if (int(dataframe.at[idx + 1, 'Output Size']) == int(dataframe.at[idx, 'Output Size'])) \
+                # or (int(dataframe.at[idx + 1, 'Output Memory (in Bytes)']) == int(dataframe.at[idx, 'Output Memory (in Bytes)'])):
+                #     optim_dataframe.at[idx + 1, 'Output Memory (in Bytes)'] = pandas.NA
+                #     optim_dataframe.at[idx + 1, 'Memory (in Bytes)'] = optim_dataframe.at[idx + 1, 'Weights and Bias Memory (in Bytes)']
+
+                #     optim_dataframe.at[idx + 1, 'Output Memory (%)'] = pandas.NA
+                #     optim_dataframe.at[idx + 1, 'Memory (%)'] = optim_dataframe.at[idx + 1, 'Weights and Bias Memory (%)']
+
+                #     optim_dataframe.at[idx + 1, 'Output Memory (in MB)'] = pandas.NA
+                #     optim_dataframe.at[idx + 1, 'Memory (in MB)'] = optim_dataframe.at[idx + 1, 'Weights and Bias Memory (in MB)']
+
+                #     mem = optim_dataframe.at[idx + 1, 'Memory (in Bytes)']
+
+                #     if mem:
+                #         optim_dataframe.at[idx + 1, 'Compute-to-Memory Ratio (Operations/Byte)'] = ((optim_dataframe.at[idx + 1, 'Compute Operations']).astype('float64') / 
+                #                                                                                     mem).astype('float64').round(3)
+                        
+                #     else:
+                #         optim_dataframe.at[idx + 1, 'Compute-to-Memory Ratio (Operations/Byte)'] = pandas.NA
+
 
         # total
         optim_dataframe.loc['Total'] = optim_dataframe.sum(numeric_only=True).round(0)
 
-        optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'), index=False, mode='w')
-
-        self.groupedSummary(
-            filename=self.model_name + '_memory_optimized_grouped_summary.csv',
-            optim_by_memory=True
-        )
+        optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'),
+                               index=False, mode='w')
 
 
     def groupedSummary(
@@ -571,16 +672,23 @@ class ONNXTransformer:
             optim_by_memory: bool = False
     ) -> None:
         dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'))
-        optim_dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'))
 
-        ref_dataframe = optim_dataframe if optim_by_memory else dataframe
+        if not optim_by_memory:
+            ref_dataframe = dataframe
+
+        else:
+            optim_dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'))
+            ref_dataframe = optim_dataframe
 
         # grouping by operator        
         grouped_dataframe = ref_dataframe[['Operator', 'Number of Params', 'Params (%)',
                                            'Compute Operations', 'Compute Operations (%)',
-                                           'Memory (in Bytes)', 'Memory (%)', 'Weights and Bias Memory (in Bytes)',
-                                           'Weights and Bias Memory (%)', 'Output Memory (in Bytes)',
-                                           'Output Memory (%)']].groupby(['Operator'], as_index=False).sum()
+                                           'Memory (in Bytes)', 'Memory (%)', 'Read Memory (in Bytes)',
+                                           'Write Memory (in Bytes)', 'Inputs Memory (in Bytes)',
+                                           'Weights and Bias Memory (in Bytes)', 'Weights and Bias Memory (%)',
+                                           'Output Memory (in Bytes)', 'Output Memory (%)',
+                                           'Memory (in MB)', 'Read Memory (in MB)',
+                                           'Write Memory (in MB)']].groupby(['Operator'], as_index=False).sum()
 
         # operator count and percent
         grouped_dataframe.insert(1, 'Count', pandas.Series(list(dataframe.groupby('Operator').size())))
@@ -640,7 +748,12 @@ class ONNXTransformer:
         return prof_path
 
 
-    def modifyGraph(self, delete_block: list, upper_2_ok: bool = False, only_middle: bool = False):
+    def modifyGraph(
+            self,
+            delete_block: list,
+            upper_2_ok: bool = False,
+            only_middle: bool = False
+    ) -> None:
         self.onnx_graph_orig = copy.deepcopy(self.onnx_model.graph)
         self.onnx_graph = self.onnx_model.graph
         
