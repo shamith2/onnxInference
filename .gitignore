@@ -7,3 +7,5 @@
 
 weights/**/*.json
 weights/**/*.txt
+
+results/**/*.json
