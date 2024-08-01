@@ -1,4 +1,4 @@
-# Cache View
+# Local Memory and Cache View
 
 import os
 from pathlib import Path
@@ -13,10 +13,93 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-__producer__ = "cacheView"
-__version__ = "0.1.0"
+__producer__ = "memoryView"
+__version__ = "0.2.0"
 
 
+# local memory view
+class lmemoryView:
+    def __init__(
+            self,
+            model_dir: str,
+            model_profile: str,
+            outputs_profile: str
+    ):
+        self.root = Path(__file__).parents[3].resolve()
+        self.workspace = Path(__file__).parent.resolve()
+
+        model_dir = '_'.join(model_dir.split(' ')).lower()
+
+        self.prof_directory = os.path.join(self.root, 'results', 'onnxProfile')
+        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir)
+        self.cache_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir, 'lmemory')
+
+        for p in [self.prof_directory, self.cache_logs_directory]:
+            if not os.path.exists(p):
+                os.makedirs(p)
+
+        self.log_files = [os.path.join(self.cache_logs_directory, 'local_memory_view.json'),
+                          os.path.join(self.cache_logs_directory, 'from_main_memory.json'),
+                          os.path.join(self.cache_logs_directory, 'to_main_memory.json')]
+
+        self.log_cache_view = []
+        self.log_from_main_memory = []
+        self.log_to_main_memory = []
+
+        self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, model_profile))
+        self.outputs_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, outputs_profile))
+
+        # drop last row since it contains totals
+        self.model_profile.drop(self.model_profile.tail(1).index, inplace=True)
+
+        self.memory_occupied = 0.0
+
+        self.local_memory = {}
+        self.memory_from_main_memory = {}
+        self.memory_to_main_memory = {}
+    
+
+    def run(
+            self
+    ) -> None:
+        operators_sequence = self.model_profile['Node']
+
+        inputs_sequence = self.model_profile['Inputs Name']
+        inputs_memory_seq = self.model_profile['Inputs Memory (in MB)']
+        
+        weights_sequence = self.model_profile['Weights and Bias Name']
+        weights_memory_seq = self.model_profile['Weights and Bias Memory (in MB)']
+        
+        outputs_sequence = self.outputs_profile['Output Name']
+        outputs_memory_seq = self.outputs_profile['Memory (in MB)']
+
+        # assert sequence_length == len(outputs_sequence)
+        sequence_length = len(operators_sequence)
+
+        # operators are in sequence
+        for operator_idx in range(sequence_length):
+            # inputs for operator
+            op_inputs = inputs_sequence.at[operator_idx]
+
+            # weights for operator
+            op_weights = weights_sequence.at[operator_idx]
+            weights_memory = weights_memory_seq[operator_idx]
+
+            # execute current operator
+            _ = operators_sequence[operator_idx]
+
+            # current operator generates output
+            current_output = outputs_sequence[operator_idx]
+            output_memory = outputs_memory_seq[operator_idx]
+
+            print(op_weights, weights_memory)
+            cc
+
+
+
+
+
+# cache view
 class cacheView:
     def __init__(
             self,
@@ -61,7 +144,6 @@ class cacheView:
 
         self.output_priority = {}
         self.memory_to_main_memory = {}
-        self.trips_main_memory = {}
 
         self.outputs_sequence = None
         self.output_index_seq = None
@@ -119,11 +201,12 @@ class cacheView:
     def refreshCache(
             self
     ) -> None:
-        # sort output_priority dict by output memory
-        # outputs with high output_memory implies that output needs to wait
-        # longer before it's used
+        # sort output_priority dict by imm_cachability and output memory
+        # output with high imm_cachability implies that the output
+        # needs to wait longer before it's used
         self.output_priority = dict(sorted(self.output_priority.items(),
-                                           key=lambda x: x[1][2], reverse=True))
+                                           key=lambda x: (x[1][1], -1 * x[1][2]),
+                                           reverse=True))
 
 
     def logData(
@@ -131,9 +214,6 @@ class cacheView:
             filename: str,
             log_data: list
     ) -> None:
-        if os.path.exists(filename):
-            os.remove(filename)
-
         with open(filename, 'w') as f:
             json.dump(log_data, f, indent=4, separators=(',',': '))
 
@@ -253,11 +333,15 @@ class cacheView:
 
     def run(
             self
-    ):
+    ) -> None:
         operators_sequence = self.model_profile['Node']
+
         inputs_sequence = self.model_profile['Inputs Name']
+        inputs_memory_seq = self.model_profile['Inputs Memory (in MB)']
+
         self.outputs_sequence = self.outputs_profile['Output Name']
         outputs_memory_seq = self.outputs_profile['Memory (in MB)']
+
         self.output_index_seq = self.outputs_profile['Output Node Index']
         self.output_freq_seq = self.outputs_profile['Frequency']
 
@@ -269,7 +353,8 @@ class cacheView:
             # inputs for operator
             op_inputs = inputs_sequence.at[operator_idx]
             
-            if not isinstance(op_inputs, str) or (operator_idx == sequence_length - 1):
+            if ((not isinstance(op_inputs, str) and not inputs_memory_seq[operator_idx]) 
+                or (operator_idx == sequence_length - 1)):
                 continue
 
             # if inputs are not in cache, they have to

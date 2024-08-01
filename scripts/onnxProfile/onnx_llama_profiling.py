@@ -3,13 +3,12 @@
 import os
 import sys
 
-import onnx
 import onnxruntime
 
 from pathlib import Path
 
 from onnxInsights.onnxHelpers import ONNXProfiler
-from onnxInsights.onnxHelpers import cacheView
+from onnxInsights.onnxHelpers import lmemoryView, cacheView
 
 root = Path(__file__).parents[2].resolve()
 workspace = Path(__file__).parent.resolve()
@@ -77,14 +76,13 @@ inferred_onnx_model_path = os.path.join(root, 'results', 'onnxProfile', 'models'
 
 # onnx_t.profileModel(inferred_onnx_model_path)
 
-cache_view = cacheView(
+local_memory_view = lmemoryView(
     model_dir='llama3_8b_fp16',
-    model_profile='llama3_8b_fp16_decodenPhase_summary.csv',
-    outputs_profile='llama3_8b_fp16_decodenPhase_track_output_summary.csv',
-    cache_size=3
+    model_profile='llama3_8b_fp16_decodenPhase_memory_optimized_summary.csv',
+    outputs_profile='llama3_8b_fp16_decodenPhase_track_output_summary.csv'
 )
 
-cache_view.run()
+local_memory_view.run()
 
 # onnx_t.profileModelonCPU(inferred_onnx_model_path)
 
