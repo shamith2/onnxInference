@@ -18,7 +18,6 @@ from onnxruntime.tools.symbolic_shape_infer import SymbolicShapeInference
 from .onnxBenchmark import get_random_input
 from .onnxOPS import OPERATORS
 
-import json
 import pandas
 import logging
 
@@ -27,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 __producer__ = "onnxProfiler"
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 
 DTYPES = {
@@ -96,6 +95,7 @@ def checkandSaveModel(
 def _convert_shape_tuple_to_string(
         tuple_of_tuple: tuple[tuple[Any]],
         add: bool = False,
+        delimiter: str = 'x',
         is_alpha: bool = False
 ) -> str:
     output = ''
@@ -106,7 +106,7 @@ def _convert_shape_tuple_to_string(
 
     if not is_alpha:
         for i, shape_tuple in enumerate(tuple_of_tuple):
-            output += 'x'.join(str(dim) for dim in shape_tuple)
+            output += str(delimiter).join(str(dim) for dim in shape_tuple)
 
             if i < len(tuple_of_tuple) - 1:
                 output += ' '
@@ -480,17 +480,16 @@ class ONNXProfiler:
                                      _convert_shape_tuple_to_string(self.input_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.wb_params_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_params_dict[node], add=True),
-                                     _convert_shape_tuple_to_string(self.input_memory_dict[node], add=True),
+                                     _convert_shape_tuple_to_string(self.input_memory_dict[node], delimiter=' '),
                                      _convert_shape_tuple_to_string(self.wb_memory_dict[node], add=True),
                                      _convert_shape_tuple_to_string(self.output_memory_dict[node], add=True)]],
                                      columns=dataframe.columns)
             
             dataframe = pandas.concat([dataframe, row], ignore_index=True)
-        
+
         # type-cast
         dataframe['Number of Params'] = dataframe['Number of Params'].astype('int64')
         dataframe['Compute Operations'] = dataframe['Compute Operations'].astype('int64')
-        dataframe['Inputs Memory (in Bytes)'] = dataframe['Inputs Memory (in Bytes)'].astype('int64')
         dataframe['Weights and Bias Memory (in Bytes)'] = dataframe['Weights and Bias Memory (in Bytes)'].astype('int64')
         dataframe['Output Memory (in Bytes)'] = dataframe['Output Memory (in Bytes)'].astype('int64')
         
@@ -504,7 +503,14 @@ class ONNXProfiler:
         dataframe.insert(8, 'Memory (%)', ((dataframe['Memory (in Bytes)'] * 100.0).astype('float64') / dataframe['Memory (in Bytes)'].sum()).astype('float64').round(3))
 
         # read and write memory
-        dataframe.insert(9, 'Read Memory (in Bytes)', (dataframe['Inputs Memory (in Bytes)'] + dataframe['Weights and Bias Memory (in Bytes)']).astype('int64'))
+        inputs_memory_bytes = pandas.Series(
+            dataframe['Inputs Memory (in Bytes)'].apply(
+                lambda x: sum([int(elem) for elem in x.split(' ')])
+            ),
+            dtype=numpy.int64
+        )
+
+        dataframe.insert(9, 'Read Memory (in Bytes)', (inputs_memory_bytes + dataframe['Weights and Bias Memory (in Bytes)']).astype('int64'))
         dataframe.insert(10, 'Write Memory (in Bytes)', dataframe['Output Memory (in Bytes)'])
 
         # operations percent
@@ -523,11 +529,23 @@ class ONNXProfiler:
                                                    dataframe['Output Memory (in Bytes)'].sum())).astype('float64').round(3))
 
         # Memory in MB
-        dataframe['Inputs Memory (in MB)'] = (dataframe['Inputs Memory (in Bytes)'] / 1e6).astype('float64').round(6)
+        dataframe['Inputs Memory (in MB)'] = pandas.Series(
+            dataframe['Inputs Memory (in Bytes)'].apply(
+                lambda x: ' '.join([str(round(float(elem) / 1e6, 6)) for elem in x.split(' ')])
+            )
+        )
+
+        inputs_memory_mb = pandas.Series(
+            dataframe['Inputs Memory (in MB)'].apply(
+                lambda x: sum([float(elem) for elem in x.split(' ')])
+            ),
+            dtype=numpy.float64
+        )
+
         dataframe['Weights and Bias Memory (in MB)'] = (dataframe['Weights and Bias Memory (in Bytes)'] / 1e6).astype('float64').round(6)
         dataframe['Output Memory (in MB)'] = (dataframe['Output Memory (in Bytes)'] / 1e6).astype('float64').round(6)
         dataframe['Memory (in MB)'] = (dataframe['Weights and Bias Memory (in MB)'] + dataframe['Output Memory (in MB)']).astype('float64').round(6)
-        dataframe['Read Memory (in MB)'] = (dataframe['Inputs Memory (in MB)'] + dataframe['Weights and Bias Memory (in MB)']).astype('float64').round(6)
+        dataframe['Read Memory (in MB)'] = (inputs_memory_mb + dataframe['Weights and Bias Memory (in MB)']).astype('float64').round(6)
         dataframe['Write Memory (in MB)'] = dataframe['Output Memory (in MB)']
 
         # total
@@ -630,33 +648,8 @@ class ONNXProfiler:
                 # re-use the output of the previous operator either by caching or operator fusion
                 if (dataframe.at[idx + 1, 'Inputs Name'] == dataframe.at[idx, 'Output Name']) \
                 or (int(dataframe.at[idx + 1, 'Inputs Size']) == int(dataframe.at[idx, 'Output Size'])):
-                    optim_dataframe.at[idx + 1, 'Inputs Memory (in Bytes)'] = pandas.NA
-                    optim_dataframe.at[idx + 1, 'Inputs Memory (in MB)'] = pandas.NA
-
-                    # optim_dataframe.at[idx + 1, 'Read Memory (in Bytes)'] = dataframe.at[idx + 1, 'Weights and Bias Memory (in Bytes)']
-                    # optim_dataframe.at[idx + 1, 'Read Memory (in MB)'] = dataframe.at[idx + 1, 'Weights and Bias Memory (in MB)']
-
-
-                # O1-b
-                # if (int(dataframe.at[idx + 1, 'Output Size']) == int(dataframe.at[idx, 'Output Size'])) \
-                # or (int(dataframe.at[idx + 1, 'Output Memory (in Bytes)']) == int(dataframe.at[idx, 'Output Memory (in Bytes)'])):
-                #     optim_dataframe.at[idx + 1, 'Output Memory (in Bytes)'] = pandas.NA
-                #     optim_dataframe.at[idx + 1, 'Memory (in Bytes)'] = optim_dataframe.at[idx + 1, 'Weights and Bias Memory (in Bytes)']
-
-                #     optim_dataframe.at[idx + 1, 'Output Memory (%)'] = pandas.NA
-                #     optim_dataframe.at[idx + 1, 'Memory (%)'] = optim_dataframe.at[idx + 1, 'Weights and Bias Memory (%)']
-
-                #     optim_dataframe.at[idx + 1, 'Output Memory (in MB)'] = pandas.NA
-                #     optim_dataframe.at[idx + 1, 'Memory (in MB)'] = optim_dataframe.at[idx + 1, 'Weights and Bias Memory (in MB)']
-
-                #     mem = optim_dataframe.at[idx + 1, 'Memory (in Bytes)']
-
-                #     if mem:
-                #         optim_dataframe.at[idx + 1, 'Compute-to-Memory Ratio (Operations/Byte)'] = ((optim_dataframe.at[idx + 1, 'Compute Operations']).astype('float64') / 
-                #                                                                                     mem).astype('float64').round(3)
-                        
-                #     else:
-                #         optim_dataframe.at[idx + 1, 'Compute-to-Memory Ratio (Operations/Byte)'] = pandas.NA
+                    optim_dataframe.at[idx + 1, 'Inputs Memory (in Bytes)'] = numpy.nan
+                    optim_dataframe.at[idx + 1, 'Inputs Memory (in MB)'] = numpy.nan
 
 
         # total
@@ -684,10 +677,9 @@ class ONNXProfiler:
         grouped_dataframe = ref_dataframe[['Operator', 'Number of Params', 'Params (%)',
                                            'Compute Operations', 'Compute Operations (%)',
                                            'Memory (in Bytes)', 'Memory (%)', 'Read Memory (in Bytes)',
-                                           'Write Memory (in Bytes)', 'Inputs Memory (in Bytes)',
-                                           'Weights and Bias Memory (in Bytes)', 'Weights and Bias Memory (%)',
-                                           'Output Memory (in Bytes)', 'Output Memory (%)',
-                                           'Memory (in MB)', 'Read Memory (in MB)',
+                                           'Write Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
+                                           'Weights and Bias Memory (%)', 'Output Memory (in Bytes)',
+                                           'Output Memory (%)', 'Memory (in MB)', 'Read Memory (in MB)',
                                            'Write Memory (in MB)']].groupby(['Operator'], as_index=False).sum()
 
         # operator count and percent

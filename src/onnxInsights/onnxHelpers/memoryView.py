@@ -17,96 +17,13 @@ __producer__ = "memoryView"
 __version__ = "0.2.0"
 
 
-# local memory view
-class lmemoryView:
-    def __init__(
-            self,
-            model_dir: str,
-            model_profile: str,
-            outputs_profile: str
-    ):
-        self.root = Path(__file__).parents[3].resolve()
-        self.workspace = Path(__file__).parent.resolve()
-
-        model_dir = '_'.join(model_dir.split(' ')).lower()
-
-        self.prof_directory = os.path.join(self.root, 'results', 'onnxProfile')
-        self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir)
-        self.cache_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir, 'lmemory')
-
-        for p in [self.prof_directory, self.cache_logs_directory]:
-            if not os.path.exists(p):
-                os.makedirs(p)
-
-        self.log_files = [os.path.join(self.cache_logs_directory, 'local_memory_view.json'),
-                          os.path.join(self.cache_logs_directory, 'from_main_memory.json'),
-                          os.path.join(self.cache_logs_directory, 'to_main_memory.json')]
-
-        self.log_cache_view = []
-        self.log_from_main_memory = []
-        self.log_to_main_memory = []
-
-        self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, model_profile))
-        self.outputs_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, outputs_profile))
-
-        # drop last row since it contains totals
-        self.model_profile.drop(self.model_profile.tail(1).index, inplace=True)
-
-        self.memory_occupied = 0.0
-
-        self.local_memory = {}
-        self.memory_from_main_memory = {}
-        self.memory_to_main_memory = {}
-    
-
-    def run(
-            self
-    ) -> None:
-        operators_sequence = self.model_profile['Node']
-
-        inputs_sequence = self.model_profile['Inputs Name']
-        inputs_memory_seq = self.model_profile['Inputs Memory (in MB)']
-        
-        weights_sequence = self.model_profile['Weights and Bias Name']
-        weights_memory_seq = self.model_profile['Weights and Bias Memory (in MB)']
-        
-        outputs_sequence = self.outputs_profile['Output Name']
-        outputs_memory_seq = self.outputs_profile['Memory (in MB)']
-
-        # assert sequence_length == len(outputs_sequence)
-        sequence_length = len(operators_sequence)
-
-        # operators are in sequence
-        for operator_idx in range(sequence_length):
-            # inputs for operator
-            op_inputs = inputs_sequence.at[operator_idx]
-
-            # weights for operator
-            op_weights = weights_sequence.at[operator_idx]
-            weights_memory = weights_memory_seq[operator_idx]
-
-            # execute current operator
-            _ = operators_sequence[operator_idx]
-
-            # current operator generates output
-            current_output = outputs_sequence[operator_idx]
-            output_memory = outputs_memory_seq[operator_idx]
-
-            print(op_weights, weights_memory)
-            cc
-
-
-
-
-
-# cache view
-class cacheView:
+# memory view
+class memoryView:
     def __init__(
             self,
             model_dir: str,
             model_profile: str,
             outputs_profile: str,
-            cache_size: int,
             frequency_threshold: int = 1,
             imm_cachability_threshold: int = 1
     ):
@@ -114,35 +31,52 @@ class cacheView:
         self.workspace = Path(__file__).parent.resolve()
 
         model_dir = '_'.join(model_dir.split(' ')).lower()
+        self.model_dataframe_file = model_profile
+        self.outputs_database_file = outputs_profile
 
         self.prof_directory = os.path.join(self.root, 'results', 'onnxProfile')
         self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir)
-        self.cache_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir, 'cache')
+        self.mem_view_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir, 'lmemory')
+        self.cache_view_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir, 'cache')
 
-        for p in [self.prof_directory, self.cache_logs_directory]:
+        for p in [self.prof_directory, self.mem_view_logs_directory]:
             if not os.path.exists(p):
                 os.makedirs(p)
 
-        self.log_files = [os.path.join(self.cache_logs_directory, 'cache_view.json'),
-                          os.path.join(self.cache_logs_directory, 'to_main_memory.json')]
+        self.log_files = {
+            'memory_view': os.path.join(self.mem_view_logs_directory, 'memory_view.json'),
+            'cache_view': os.path.join(self.cache_view_logs_directory, 'cache_view.json'),
+            'from_main_memory': os.path.join(self.mem_view_logs_directory, 'from_main_memory.json'),
+            'to_main_memory': os.path.join(self.mem_view_logs_directory, 'to_main_memory.json'),
+            'cache_from_main_memory': os.path.join(self.cache_view_logs_directory, 'from_main_memory.json'),
+            'cache_to_main_memory': os.path.join(self.cache_view_logs_directory, 'to_main_memory.json')
+        }
 
-        self.log_cache_view = []
-        self.log_to_main_memory = []
-
-        self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, model_profile))
-        self.outputs_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, outputs_profile))
-
-        # drop last row since it contains totals
-        self.model_profile.drop(self.model_profile.tail(1).index, inplace=True)
-        
         # hyperparameters
-        self.cache_size = cache_size # cache size (in MB)
         self.frequency_threshold = frequency_threshold
         self.imm_cachability_threshold = imm_cachability_threshold
 
+
+    def reset(
+            self
+    ) -> None:
+        self.log_cache_view = []
+        self.log_memory_view = []
+        self.log_from_main_memory = []
+        self.log_to_main_memory = []
+
+        self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_dataframe_file))
+        self.outputs_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.outputs_database_file))
+
+        # drop last row since it contains totals
+        self.model_profile.drop(self.model_profile.tail(1).index, inplace=True)
+
         self.cache_occupied = 0.0
+        self.memory_occupied = 0.0
 
         self.output_priority = {}
+        self.local_memory = {}
+        self.memory_from_main_memory = {}
         self.memory_to_main_memory = {}
 
         self.outputs_sequence = None
@@ -201,9 +135,10 @@ class cacheView:
     def refreshCache(
             self
     ) -> None:
-        # sort output_priority dict by imm_cachability and output memory
+        # sort output_priority dict by frequency and imm_cachability
         # output with high imm_cachability implies that the output
-        # needs to wait longer before it's used
+        # needs to wait longer before it's used but high frequency
+        # implies the output is used frequently
         self.output_priority = dict(sorted(self.output_priority.items(),
                                            key=lambda x: (x[1][1], -1 * x[1][2]),
                                            reverse=True))
@@ -226,7 +161,7 @@ class cacheView:
     ) -> int:
         input_indices = [int(elem) for elem in input_indices.split(' ')]
 
-        frequency = self.output_index_seq[self.outputs_sequence == key].item()
+        frequency = self.output_freq_seq[self.outputs_sequence == key].item()
         output_index = self.output_index_seq[self.outputs_sequence == key].item()
         imm_cachability = input_indices[0] - output_index
         
@@ -255,7 +190,7 @@ class cacheView:
             self.output_priority = self.updateDict(
                 self.output_priority,
                 key,
-                (output_idx, imm_cachability, output_memory),
+                (output_idx, frequency, imm_cachability, output_memory),
                 overwrite=None
             )
 
@@ -272,7 +207,7 @@ class cacheView:
         else:
             while self.cache_occupied < self.cache_size:
                 dict_keys, dict_values = zip(*self.output_priority.items())
-                self.evictKeyfromCache(dict_keys[0], dict_values[0][2])
+                self.evictKeyfromCache(dict_keys[-1], dict_values[-1][3])
 
         return 0
 
@@ -281,7 +216,7 @@ class cacheView:
             self,
             key: str
     ) -> int:
-        output_idx, imm_cachability, output_memory = self.output_priority[key]
+        output_idx, frequency, imm_cachability, output_memory = self.output_priority[key]
         operator_idx = output_idx - 1
 
         input_indices = self.outputs_profile['Input Node Index'].at[operator_idx]
@@ -300,7 +235,7 @@ class cacheView:
         
         self.outputs_profile['Input Node Index'].at[operator_idx] = updated_input_indices
 
-        frequency = self.output_index_seq[self.outputs_sequence == key].item()
+        frequency = self.output_freq_seq[self.outputs_sequence == key].item()
         # output_index = self.output_index_seq[self.outputs_sequence == key].item()
         # assert output_index == output_idx
         imm_cachability = input_indices[0] - output_idx
@@ -310,7 +245,7 @@ class cacheView:
             self.output_priority = self.updateDict(
                     self.output_priority,
                     key,
-                    (output_idx, imm_cachability, output_memory),
+                    (output_idx, frequency, imm_cachability, output_memory),
                     overwrite=True
                 )
 
@@ -331,9 +266,96 @@ class cacheView:
         return 0
 
 
-    def run(
+    def run_without_cache(
             self
     ) -> None:
+        self.reset()
+
+        operators_sequence = self.model_profile['Node']
+
+        inputs_sequence = self.model_profile['Inputs Name']
+        inputs_memory_seq = self.model_profile['Inputs Memory (in MB)']
+        
+        weights_sequence = self.model_profile['Weights and Bias Name']
+        weights_memory_seq = self.model_profile['Weights and Bias Memory (in MB)']
+        
+        outputs_sequence = self.outputs_profile['Output Name']
+        outputs_memory_seq = self.outputs_profile['Memory (in MB)']
+
+        # assert sequence_length == len(outputs_sequence)
+        sequence_length = len(operators_sequence)
+
+        # operators are in sequence
+        for operator_idx in range(sequence_length):
+            self.memory_from_main_memory = {}
+            self.memory_to_main_memory = {}
+
+            # inputs for operator
+            op_inputs = inputs_sequence.at[operator_idx]
+            inputs_memory = inputs_memory_seq.at[operator_idx]
+
+            # weights for operator
+            op_weights = weights_sequence.at[operator_idx]
+            weights_memory = weights_memory_seq[operator_idx]
+
+            if ((not isinstance(op_inputs, str) or not isinstance(inputs_memory, str))
+                or (not isinstance(op_weights, str) or (weights_memory is numpy.nan))
+                or (operator_idx == sequence_length - 1)):
+                continue
+
+            op_inputs = op_inputs.split(' ')
+            inputs_memory = [float(elem) for elem in inputs_memory.split(' ')]
+
+            # get inputs for operator from main memory
+            for i in range(len(op_inputs)):
+                self.memory_from_main_memory = self.updateDict(
+                    self.memory_from_main_memory,
+                    op_inputs[i],
+                    inputs_memory[i],
+                    overwrite=False
+                )
+            
+            # get weights for operator from main memory
+            self.memory_from_main_memory = self.updateDict(
+                self.memory_from_main_memory,
+                op_weights,
+                weights_memory,
+                overwrite=False
+            )
+
+            # execute current operator
+            _ = operators_sequence[operator_idx]
+
+            # current operator generates output
+            current_output = outputs_sequence[operator_idx]
+            output_memory = outputs_memory_seq[operator_idx]
+
+            # local memory: weights + output (activations)
+            
+            # output to main memory
+            self.memory_to_main_memory = self.updateDict(
+                self.memory_to_main_memory,
+                current_output,
+                output_memory,
+                overwrite=False
+            )
+
+            self.log_from_main_memory.append(self.memory_from_main_memory)
+            self.log_to_main_memory.append(self.memory_to_main_memory)
+
+        self.logData(self.log_files['from_main_memory'], self.log_from_main_memory)
+        self.logData(self.log_files['to_main_memory'], self.log_to_main_memory)
+
+
+    def run_with_cache(
+            self,
+            cache_size: int
+    ) -> None:
+        # cache size (in MB)
+        self.cache_size = cache_size
+
+        self.reset()
+
         operators_sequence = self.model_profile['Node']
 
         inputs_sequence = self.model_profile['Inputs Name']
@@ -350,10 +372,13 @@ class cacheView:
 
         # operators are in sequence
         for operator_idx in range(sequence_length):
+            self.memory_to_main_memory = {}
+
             # inputs for operator
             op_inputs = inputs_sequence.at[operator_idx]
-            
-            if ((not isinstance(op_inputs, str) and not inputs_memory_seq[operator_idx]) 
+            inputs_memory = inputs_memory_seq[operator_idx]
+
+            if ((not isinstance(op_inputs, str) or not isinstance(inputs_memory, str)) 
                 or (operator_idx == sequence_length - 1)):
                 continue
 
@@ -390,7 +415,7 @@ class cacheView:
                     self.memory_to_main_memory,
                     current_output,
                     output_memory,
-                    overwrite=None
+                    overwrite=False
                 )
 
             else:
@@ -412,11 +437,11 @@ class cacheView:
             self.memory_to_main_memory,
             self.outputs_sequence[sequence_length - 1],
             outputs_memory_seq[sequence_length - 1],
-            overwrite=None
+            overwrite=False
         )
 
         self.log_to_main_memory.append(self.memory_to_main_memory)
 
-        self.logData(self.log_files[0], self.log_cache_view)
-        self.logData(self.log_files[1], self.log_to_main_memory)
+        self.logData(self.log_files['cache_view'], self.log_cache_view)
+        self.logData(self.log_files['cache_to_main_memory'], self.log_to_main_memory)
 
