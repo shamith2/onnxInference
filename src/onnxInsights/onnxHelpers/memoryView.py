@@ -370,7 +370,7 @@ class memoryView:
             current_output = outputs_sequence[operator_idx]
             output_memory = outputs_memory_seq[operator_idx]
 
-            if _no_inputs and _no_weights:
+            if _no_inputs or (_no_inputs and _no_weights):
                 if operator_idx > 0:
                     self.main_memory_context = self.log_main_memory_context[-1]
 
@@ -381,6 +381,15 @@ class memoryView:
                     value=operator_idx + 1,
                     overwrite=False
                 )
+
+                if _no_inputs and not _no_weights:
+                    self.main_memory_context = self.updateDict(
+                        self.main_memory_context,
+                        subdict='weights',
+                        key=op_weights,
+                        value=weights_memory,
+                        overwrite=False
+                    )
 
                 # output to main memory
                 self.main_memory_context = self.updateDict(
@@ -406,19 +415,15 @@ class memoryView:
                     self.log_main_memory_context[-1] = self.main_memory_context
 
             else:
-                if not _no_inputs:
-                    # get inputs for operator from main memory
-                    for i in range(len(op_inputs)):
-                        self.main_memory_context = self.updateDict(
-                            self.main_memory_context,
-                            subdict='inputs',
-                            key=op_inputs[i],
-                            value=inputs_memory[i],
-                            overwrite=False
-                        )
-
-                else:
-                    self.main_memory_context['inputs'] = {}
+                # get inputs for operator from main memory
+                for i in range(len(op_inputs)):
+                    self.main_memory_context = self.updateDict(
+                        self.main_memory_context,
+                        subdict='inputs',
+                        key=op_inputs[i],
+                        value=inputs_memory[i],
+                        overwrite=False
+                    )
 
                 if not _no_weights:
                     # get weights for operator from main memory
