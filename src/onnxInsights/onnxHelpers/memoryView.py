@@ -273,7 +273,7 @@ class memoryView:
         
         self.outputs_profile['Input Node Index'].at[operator_idx] = updated_input_indices
 
-        frequency = self.output_freq_seq[self.outputs_sequence == key].item()
+        frequency -= 1
         # output_index = self.output_index_seq[self.outputs_sequence == key].item()
         # assert output_index == output_idx
         imm_cachability = input_indices[0] - output_idx
