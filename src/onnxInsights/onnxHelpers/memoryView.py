@@ -75,7 +75,10 @@ class memoryView:
         self.cache_occupied = 0.0
         self.memory_occupied = 0.0
 
-        self.cache_context = {'entries': {}}
+        self.jsonKey = 'traceEvents'
+        self.cache_parentKey = 'entries'
+
+        self.cache_context = {self.cache_parentKey: {}}
         self.local_memory = {}
         self.main_memory_context = {}
 
@@ -150,7 +153,7 @@ class memoryView:
             key: str,
             memory: float
     ) -> None:
-        del self.cache_context['entries'][key]
+        del self.cache_context[self.cache_parentKey][key]
         self.cache_occupied -= memory
 
         self.refreshCache()
@@ -163,7 +166,7 @@ class memoryView:
         # output with high imm_cachability implies that the output
         # needs to wait longer before it's used but high frequency
         # implies the output is used frequently
-        self.cache_context['entries'] = dict(sorted(self.cache_context['entries'].items(),
+        self.cache_context[self.cache_parentKey] = dict(sorted(self.cache_context[self.cache_parentKey].items(),
                                          key=lambda x: (x[1]['frequency'], -1 * x[1]['imm_cachability']),
                                          reverse=True))
 
@@ -214,7 +217,7 @@ class memoryView:
             # add output to cache
             self.cache_context = self.updateDict(
                 self.cache_context,
-                subdict='entries',
+                subdict=self.cache_parentKey,
                 key=key,
                 value={
                     'output_id': output_idx,
@@ -238,7 +241,7 @@ class memoryView:
         # is the last entry of the cache context
         else:
             while self.cache_occupied < self.cache_size:
-                dict_keys, dict_values = zip(*self.cache_context['entries'].items())
+                dict_keys, dict_values = zip(*self.cache_context[self.cache_parentKey].items())
                 self.evictKeyfromCache(dict_keys[-1], dict_values[-1]['memory'])
 
         return 0
@@ -248,7 +251,7 @@ class memoryView:
             self,
             key: str
     ) -> int:
-        output_dict = self.cache_context['entries'][key]
+        output_dict = self.cache_context[self.cache_parentKey][key]
 
         output_idx = output_dict['output_id']
         frequency = output_dict['frequency']
@@ -282,7 +285,7 @@ class memoryView:
         if self.evaluateOutput(frequency, imm_cachability):
             self.cache_context = self.updateDict(
                     self.cache_context,
-                    subdict='entries',
+                    subdict=self.cache_parentKey,
                     key=key,
                     value={
                         'output_id': output_idx,
@@ -567,7 +570,7 @@ class memoryView:
             # be pulled from main memory
             for op_input in op_inputs.split(' '):
                 # if output is in cache, retrieve it from cache
-                if self.checkKeyinDict(self.cache_context['entries'], op_input):
+                if self.checkKeyinDict(self.cache_context[self.cache_parentKey], op_input):
                     _ = self.retrieveKeyfromCache(op_input)
 
                 else:
@@ -610,7 +613,7 @@ class memoryView:
 
             else:
                 # else check if the output can be cached and cache it
-                if not self.checkKeyinDict(self.cache_context['entries'], current_output):
+                if not self.checkKeyinDict(self.cache_context[self.cache_parentKey], current_output):
                     _ = self.updateCache(
                         current_output,
                         input_indices,
