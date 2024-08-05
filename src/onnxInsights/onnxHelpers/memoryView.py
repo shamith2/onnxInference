@@ -226,7 +226,7 @@ class memoryView:
 
         x = range(len(filtered_mem_usage))
         min_val = min(filtered_mem_usage)
-        max_val = max(filtered_mem_usage) + 1
+        max_val = max(filtered_mem_usage)
 
         _ = ax.scatter(
             x,
@@ -235,8 +235,8 @@ class memoryView:
 
         # set axes labels and title
         ax.set_xticks(x)
-        y_range = (numpy.linspace(min_val, max_val, steps) if steps
-                   else numpy.linspace(min_val, max_val))
+        y_range = (numpy.linspace(min_val, max_val, steps, endpoint=True) if steps
+                   else numpy.linspace(min_val, max_val, endpoint=True))
         ax.set_yticks(y_range)
 
         if not for_cache:
@@ -244,7 +244,7 @@ class memoryView:
             ax.set_ylabel('Total Memory Size [in MB]')
 
             fig.suptitle('Memory Profile\n', fontweight='bold')
-            ax.set_title('Memory Size of Operators (>= {} MB and < {} MB)\n'.format(int(min_val), int(max_val)) +
+            ax.set_title('Memory Size of Operators (>= {} MB and < {} MB)\n'.format(int(min_val), int(max_val) + 1) +
                         'Total Memory = Inputs Memory + Weights Memory + Outputs Memory')
 
         else:
@@ -252,7 +252,7 @@ class memoryView:
             ax.set_ylabel('Memory used [in MB]')
 
             fig.suptitle('Cache Profile\n', fontweight='bold')
-            ax.set_title('Cache Size (>= {} MB and < {} MB)\n'.format(int(min_val), int(max_val)) +
+            ax.set_title('Cache Size (>= {} MB and < {} MB)\n'.format(int(min_val), int(max_val) + 1) +
                          'Cache Memory = Outputs Memory')
 
         plt.tick_params(bottom=True, labelbottom=False)
@@ -621,7 +621,7 @@ class memoryView:
             self.plotMemory(
                 self.log_memory_usage,
                 self.memory_size,
-                120,
+                None,
                 steps=None,
                 display=True
             )
