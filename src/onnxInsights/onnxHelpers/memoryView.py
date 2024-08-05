@@ -75,7 +75,6 @@ class memoryView:
         self.cache_occupied = 0.0
         self.memory_occupied = 0.0
 
-        self.jsonKey = 'traceEvents'
         self.cache_parentKey = 'entries'
 
         self.cache_context = {self.cache_parentKey: {}}
