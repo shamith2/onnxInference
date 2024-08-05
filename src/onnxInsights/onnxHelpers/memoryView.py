@@ -371,18 +371,23 @@ class memoryView:
                 op_inputs = [numpy.nan]
                 inputs_memory = [0.0]
 
-            _input_metadata = [copy.deepcopy(op_inputs), copy.deepcopy(inputs_memory)]
+            if not isinstance(op_weights, str) or not weights_memory:
+                _no_weights = True
 
+            _input_metadata = [copy.deepcopy(op_inputs), copy.deepcopy(inputs_memory)]
+            _prev_memory_adder = 0.0
+
+            # check if inputs are outputs to previous operators,
+            # yes, then, the operator can be fused provided
+            # the memory size requirements are met
             if operator_idx > 0:
                 output_list = self.log_main_memory_context[-1]['outputs'].keys()
+                _prev_memory_adder = self.log_main_memory_context[-1]['total_memory']
 
                 for i, op_input in enumerate(op_inputs):
                     if op_input and (op_input in output_list):
                         op_inputs[i] = numpy.nan
                         inputs_memory[i] = 0.0
-
-            if not isinstance(op_weights, str) or not weights_memory:
-                _no_weights = True
 
             # current operator's output
             current_output = outputs_sequence[operator_idx]
@@ -391,9 +396,7 @@ class memoryView:
             inst_total_memory = round(sum(inputs_memory) + weights_memory + output_memory,
                                       self.rounding_decimal)
 
-            _prev_memory_adder = self.log_main_memory_context[-1]['total_memory'] if operator_idx > 0 else 0.0
-
-            if inst_total_memory + _prev_memory_adder < self.memory_size:
+            if _prev_memory_adder + inst_total_memory < self.memory_size:
                 if operator_idx > 0:
                     self.main_memory_context = self.log_main_memory_context[-1]
 
