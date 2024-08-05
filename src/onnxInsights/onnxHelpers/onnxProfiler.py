@@ -449,9 +449,6 @@ class ONNXProfiler:
         # track outputs
         self.trackOutputs()
 
-        # optimize operators by memory
-        self.optimizeOperatorsbyMemory()
-
         logging.info("Profiling logs stored in directory: {}".format(self.profile_logs_directory))
 
         return 0
@@ -555,8 +552,7 @@ class ONNXProfiler:
                          index=False, mode='w')
 
         self.groupedSummary(
-            filename=self.model_name + '_grouped_summary.csv',
-            optim_by_memory=False
+            filename=self.model_name + '_grouped_summary.csv'
         )
 
 
@@ -629,52 +625,14 @@ class ONNXProfiler:
                              index=False, mode='w')
 
 
-    def optimizeOperatorsbyMemory(
-            self
-    ) -> None:
-        dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'))
-
-        optim_dataframe = dataframe.copy(deep=True)
-
-        # drop last row since it contains totals
-        optim_dataframe.drop(optim_dataframe.tail(1).index, inplace=True)
-
-        # optimize operators having consecutive same output memory size
-        for idx, _ in dataframe.iterrows():
-            if idx < dataframe.shape[0] - 2: # ignore last row since it contains totals
-                # additional logic for redundancy
-                # O1 (Operator Fusion): If a consecutive operator uses the output of its previous operator
-                # as its input, the operator does not need to read input from main/global memory, it can
-                # re-use the output of the previous operator either by caching or operator fusion
-                if (dataframe.at[idx + 1, 'Inputs Name'] == dataframe.at[idx, 'Output Name']) \
-                or (int(dataframe.at[idx + 1, 'Inputs Size']) == int(dataframe.at[idx, 'Output Size'])):
-                    optim_dataframe.at[idx + 1, 'Inputs Memory (in Bytes)'] = numpy.nan
-                    optim_dataframe.at[idx + 1, 'Inputs Memory (in MB)'] = numpy.nan
-
-
-        # total
-        optim_dataframe.loc['Total'] = optim_dataframe.sum(numeric_only=True).round(0)
-
-        optim_dataframe.to_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'),
-                               index=False, mode='w')
-
-
     def groupedSummary(
             self,
-            filename: str,
-            optim_by_memory: bool = False
+            filename: str
     ) -> None:
         dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_summary.csv'))
 
-        if not optim_by_memory:
-            ref_dataframe = dataframe
-
-        else:
-            optim_dataframe = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_name + '_memory_optimized_summary.csv'))
-            ref_dataframe = optim_dataframe
-
         # grouping by operator        
-        grouped_dataframe = ref_dataframe[['Operator', 'Number of Params', 'Params (%)',
+        grouped_dataframe = dataframe[['Operator', 'Number of Params', 'Params (%)',
                                            'Compute Operations', 'Compute Operations (%)',
                                            'Memory (in Bytes)', 'Memory (%)', 'Read Memory (in Bytes)',
                                            'Write Memory (in Bytes)', 'Weights and Bias Memory (in Bytes)',
@@ -685,11 +643,6 @@ class ONNXProfiler:
         # operator count and percent
         grouped_dataframe.insert(1, 'Count', pandas.Series(list(dataframe.groupby('Operator').size())))
         grouped_dataframe.insert(2, 'Count (%)', ((grouped_dataframe['Count'] * 100.0).astype('float64') / grouped_dataframe['Count'].sum()).astype('float64').round(3))
-
-        if optim_by_memory:
-            # memory optimized operator count and percent
-            grouped_dataframe.insert(3, 'Optimized Count', pandas.Series(list(optim_dataframe.groupby('Operator').size())))
-            grouped_dataframe.insert(4, 'Optimized Count (%)', ((grouped_dataframe['Optimized Count'] * 100.0).astype('float64') / grouped_dataframe['Optimized Count'].sum()).astype('float64').round(3))
 
         grouped_dataframe.insert(9, 'Average Compute-to-Memory Ratio (Operations/Byte)', ((grouped_dataframe['Compute Operations']).astype('float64') / grouped_dataframe['Memory (in Bytes)']).astype('float64').round(3))
 

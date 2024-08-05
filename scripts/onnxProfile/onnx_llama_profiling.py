@@ -78,11 +78,11 @@ inferred_onnx_model_path = os.path.join(root, 'results', 'onnxProfile', 'models'
 
 local_memory_view = memoryView(
     model_dir='llama3_8b_fp16',
-    model_profile='llama3_8b_fp16_decodenPhase_memory_optimized_summary.csv',
+    model_profile='llama3_8b_fp16_decodenPhase_summary.csv',
     outputs_profile='llama3_8b_fp16_decodenPhase_track_output_summary.csv'
 )
 
-local_memory_view.run_without_cache()
+local_memory_view.run_without_cache(memory_size=3)
 
 local_memory_view.run_with_cache(cache_size=3)
 

@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 __producer__ = "memoryView"
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 
 # memory view
@@ -201,7 +201,7 @@ class memoryView:
         else:
             self.main_memory_context = self.updateDict(
                 self.main_memory_context,
-                subdict='output',
+                subdict='outputs',
                 key=key,
                 value=output_memory,
                 overwrite=False
@@ -300,7 +300,7 @@ class memoryView:
 
             self.main_memory_context = self.updateDict(
                 self.main_memory_context,
-                subdict='output',
+                subdict='outputs',
                 key=key,
                 value=output_memory,
                 overwrite=False
@@ -312,11 +312,16 @@ class memoryView:
 
 
     def run_without_cache(
-            self
+            self,
+            memory_size: int
     ) -> None:
+        # memory size (in MB)
+        self.memory_size = memory_size
+
         self.reset()
 
         operators_sequence = self.model_profile['Node']
+        compute_operations_sequence = self.model_profile['Compute Operations']
 
         inputs_sequence = self.model_profile['Inputs Name']
         inputs_memory_seq = self.model_profile['Inputs Memory (in MB)']
@@ -333,11 +338,14 @@ class memoryView:
         # operators are in sequence
         for operator_idx in range(sequence_length):
             self.main_memory_context = {}
-            _no_inputs = False
             _no_weights = False
 
             # current operator to be executed
             _ = operators_sequence[operator_idx]
+
+            # compute operations of operator (in GOPS)
+            compute_ops = round(float(compute_operations_sequence[operator_idx]) / 1e6,
+                                self.rounding_decimal)
 
             self.main_memory_context = self.updateDict(
                 self.main_memory_context,
@@ -360,8 +368,18 @@ class memoryView:
                 inputs_memory = [float(elem) for elem in inputs_memory.split(' ')]
 
             else:
+                op_inputs = [numpy.nan]
                 inputs_memory = [0.0]
-                _no_inputs = True
+
+            _input_metadata = [copy.deepcopy(op_inputs), copy.deepcopy(inputs_memory)]
+
+            if operator_idx > 0:
+                output_list = self.log_main_memory_context[-1]['outputs'].keys()
+
+                for i, op_input in enumerate(op_inputs):
+                    if op_input and (op_input in output_list):
+                        op_inputs[i] = numpy.nan
+                        inputs_memory[i] = 0.0
 
             if not isinstance(op_weights, str) or not weights_memory:
                 _no_weights = True
@@ -370,7 +388,12 @@ class memoryView:
             current_output = outputs_sequence[operator_idx]
             output_memory = outputs_memory_seq[operator_idx]
 
-            if _no_inputs or (_no_inputs and _no_weights):
+            inst_total_memory = round(sum(inputs_memory) + weights_memory + output_memory,
+                                      self.rounding_decimal)
+
+            _prev_memory_adder = self.log_main_memory_context[-1]['total_memory'] if operator_idx > 0 else 0.0
+
+            if inst_total_memory + _prev_memory_adder < self.memory_size:
                 if operator_idx > 0:
                     self.main_memory_context = self.log_main_memory_context[-1]
 
@@ -382,7 +405,28 @@ class memoryView:
                     overwrite=False
                 )
 
-                if _no_inputs and not _no_weights:
+                # compute operators for operator
+                self.main_memory_context = self.updateDict(
+                    self.main_memory_context,
+                    subdict=None,
+                    key='compute',
+                    value=compute_ops,
+                    overwrite=False,
+                    add=True
+                )
+
+                if _no_weights:
+                    for i in range(len(op_inputs)):
+                        if op_inputs[i] and inputs_memory[i]:
+                            self.main_memory_context = self.updateDict(
+                                self.main_memory_context,
+                                subdict='inputs',
+                                key=op_inputs[i],
+                                value=inputs_memory[i],
+                                overwrite=True
+                            )
+
+                else:
                     self.main_memory_context = self.updateDict(
                         self.main_memory_context,
                         subdict='weights',
@@ -394,7 +438,7 @@ class memoryView:
                 # output to main memory
                 self.main_memory_context = self.updateDict(
                     self.main_memory_context,
-                    subdict='output',
+                    subdict='outputs',
                     key=current_output,
                     value=output_memory,
                     overwrite=False
@@ -405,8 +449,7 @@ class memoryView:
                     self.main_memory_context,
                     subdict=None,
                     key='total_memory',
-                    value=round(sum(inputs_memory) + weights_memory + output_memory,
-                                self.rounding_decimal),
+                    value=inst_total_memory,
                     overwrite=False,
                     add=True
                 )
@@ -415,15 +458,24 @@ class memoryView:
                     self.log_main_memory_context[-1] = self.main_memory_context
 
             else:
-                # get inputs for operator from main memory
-                for i in range(len(op_inputs)):
-                    self.main_memory_context = self.updateDict(
-                        self.main_memory_context,
-                        subdict='inputs',
-                        key=op_inputs[i],
-                        value=inputs_memory[i],
-                        overwrite=False
-                    )
+                op_inputs = _input_metadata[0]
+                inputs_memory = _input_metadata[1]
+                _all_valid_inputs = all([False if op_input is numpy.nan else True for op_input in op_inputs])
+
+                if _all_valid_inputs:
+                    # get inputs for operator from main memory
+                    for i in range(len(op_inputs)):
+                        if op_inputs[i] and inputs_memory[i]:
+                            self.main_memory_context = self.updateDict(
+                                self.main_memory_context,
+                                subdict='inputs',
+                                key=op_inputs[i],
+                                value=inputs_memory[i],
+                                overwrite=False
+                            )
+
+                else:
+                    self.main_memory_context['inputs'] = {}
 
                 if not _no_weights:
                     # get weights for operator from main memory
@@ -441,9 +493,18 @@ class memoryView:
                 # output to main memory
                 self.main_memory_context = self.updateDict(
                     self.main_memory_context,
-                    subdict='output',
+                    subdict='outputs',
                     key=current_output,
                     value=output_memory,
+                    overwrite=False
+                )
+
+                # compute operators for operator
+                self.main_memory_context = self.updateDict(
+                    self.main_memory_context,
+                    subdict=None,
+                    key='compute',
+                    value=compute_ops,
                     overwrite=False
                 )
 
@@ -452,8 +513,7 @@ class memoryView:
                     self.main_memory_context,
                     subdict=None,
                     key='total_memory',
-                    value=round(sum(inputs_memory) + weights_memory + output_memory,
-                                self.rounding_decimal),
+                    value=inst_total_memory,
                     overwrite=False
                 )
 
@@ -539,7 +599,7 @@ class memoryView:
             if (output_memory >= self.cache_size):
                 self.main_memory_context = self.updateDict(
                     self.main_memory_context,
-                    subdict='output',
+                    subdict='outputs',
                     key=current_output,
                     value=output_memory,
                     overwrite=False
@@ -568,7 +628,7 @@ class memoryView:
             self.log_cache_view.append(copy.deepcopy(self.cache_context))
 
             try:
-                _ = self.main_memory_context['output']
+                _ = self.main_memory_context['outputs']
                 self.log_main_memory_context.append(self.main_memory_context)
             except KeyError:
                 pass
@@ -576,7 +636,7 @@ class memoryView:
         # the last output needs to go to main memory
         self.main_memory_context = self.updateDict(
             self.main_memory_context,
-            subdict='output',
+            subdict='outputs',
             key=self.outputs_sequence[sequence_length - 1],
             value=outputs_memory_seq[sequence_length - 1],
             overwrite=False
