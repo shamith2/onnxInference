@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy
 import pandas
+from matplotlib import pyplot as plt
 
 import json
 import logging
@@ -64,6 +65,8 @@ class memoryView:
     ) -> None:
         self.log_cache_view = []
         self.log_memory_view = []
+        self.log_memory_usage = []
+        self.log_cache_memory_usage = []
         self.log_main_memory_context = []
 
         self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_dataframe_file))
@@ -177,6 +180,89 @@ class memoryView:
     ) -> None:
         with open(filename, 'w') as f:
             json.dump(log_data, f, indent=4, separators=(',',': '))
+
+
+    def findOutliers(
+            self,
+            data: list,
+            min_val: float,
+            max_val: float
+    ) -> list:
+        filtered_data = []
+
+        for memory_val in data:
+            if memory_val >= min_val and memory_val <= max_val:
+                filtered_data.append(memory_val)
+        
+        return filtered_data
+
+
+    def plotMemory(
+            self,
+            memory_usage: list,
+            min_val: float,
+            max_val: float,
+            steps: int,
+            for_cache: bool = False,
+            display: bool = False
+    ) -> None:
+        if not for_cache:
+            if not min_val:
+                min_val = min(memory_usage)
+
+            if not max_val:
+                max_val = max(memory_usage)
+
+            filtered_mem_usage = self.findOutliers(
+                memory_usage,
+                min_val,
+                max_val
+            )
+
+        else:
+            filtered_mem_usage = memory_usage
+
+        fig, ax = plt.subplots(figsize=(18, 12))
+
+        x = range(len(filtered_mem_usage))
+        min_val = min(filtered_mem_usage)
+        max_val = max(filtered_mem_usage) + 1
+
+        _ = ax.scatter(
+            x,
+            filtered_mem_usage
+        )
+
+        # set axes labels and title
+        ax.set_xticks(x)
+        y_range = (numpy.linspace(min_val, max_val, steps) if steps
+                   else numpy.linspace(min_val, max_val))
+        ax.set_yticks(y_range)
+
+        if not for_cache:
+            ax.set_xlabel('Operator')      
+            ax.set_ylabel('Total Memory Size [in MB]')
+
+            fig.suptitle('Memory Profile\n', fontweight='bold')
+            ax.set_title('Memory Size of Operators (>= {} MB and < {} MB)\n'.format(int(min_val), int(max_val)) +
+                        'Total Memory = Inputs Memory + Weights Memory + Outputs Memory')
+
+        else:
+            ax.set_xlabel('Timestep')
+            ax.set_ylabel('Memory used [in MB]')
+
+            fig.suptitle('Cache Profile\n', fontweight='bold')
+            ax.set_title('Cache Size (>= {} MB and < {} MB)\n'.format(int(min_val), int(max_val)) +
+                         'Cache Memory = Outputs Memory')
+
+        plt.tick_params(bottom=True, labelbottom=False)
+        plt.tight_layout()
+
+        if display:
+            plt.show()
+
+        else:
+            plt.close(fig)
 
 
     def updateCache(
@@ -315,7 +401,8 @@ class memoryView:
 
     def run_without_cache(
             self,
-            memory_size: int
+            memory_size: int,
+            plot_memory: bool = False
     ) -> None:
         # memory size (in MB)
         self.memory_size = memory_size
@@ -526,10 +613,24 @@ class memoryView:
 
         self.logData(self.log_files['main_memory_context'], self.log_main_memory_context)
 
+        if plot_memory:
+            # memory usage
+            for entry in self.log_main_memory_context:
+                self.log_memory_usage.append(entry['total_memory'])
+
+            self.plotMemory(
+                self.log_memory_usage,
+                self.memory_size,
+                120,
+                steps=None,
+                display=True
+            )
+
 
     def run_with_cache(
             self,
-            cache_size: int
+            cache_size: int,
+            plot_memory: bool = False
     ) -> None:
         # cache size (in MB)
         self.cache_size = cache_size
@@ -623,9 +724,7 @@ class memoryView:
                 self.cache_context,
                 subdict=None,
                 key='cache_occupied',
-                value={
-                        'remaining_memory': (self.cache_size - self.cache_occupied)
-                    },
+                value=self.cache_occupied,
                 overwrite=True
             )
 
@@ -651,4 +750,18 @@ class memoryView:
 
         self.logData(self.log_files['cache_view'], self.log_cache_view)
         self.logData(self.log_files['cache_main_memory_context'], self.log_main_memory_context)
+
+        if plot_memory:
+            # memory usage
+            for entry in self.log_cache_view:
+                self.log_cache_memory_usage.append(entry['cache_occupied'])
+
+            self.plotMemory(
+                self.log_cache_memory_usage,
+                None,
+                None,
+                steps=None,
+                for_cache=True,
+                display=True
+            )
 

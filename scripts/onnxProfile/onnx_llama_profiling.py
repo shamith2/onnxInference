@@ -82,9 +82,9 @@ local_memory_view = memoryView(
     outputs_profile='llama3_8b_fp16_decodenPhase_track_output_summary.csv'
 )
 
-local_memory_view.run_without_cache(memory_size=3)
+local_memory_view.run_without_cache(memory_size=3, plot_memory=True)
 
-local_memory_view.run_with_cache(cache_size=3)
+local_memory_view.run_with_cache(cache_size=3, plot_memory=True)
 
 # onnx_t.profileModelonCPU(inferred_onnx_model_path)
 
