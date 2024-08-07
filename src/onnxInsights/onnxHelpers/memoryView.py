@@ -587,7 +587,7 @@ class memoryView:
 
     def run_with_cache(
             self,
-            memory_size: int,
+            local_memory_size: int,
             cache_size: int,
             final_outputs: tuple,
             plot_memory: bool = False
@@ -596,7 +596,7 @@ class memoryView:
         self.cache_size = cache_size
 
         log_memory_context = self.generate_view(
-            memory_size=memory_size,
+            memory_size=local_memory_size,
             plot_memory=False
         )
 
