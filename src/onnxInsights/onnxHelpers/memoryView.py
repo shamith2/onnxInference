@@ -688,7 +688,7 @@ class memoryView:
                     continue
 
                 # check if output is an intermediate output
-                # (consumed within the operation fusion)
+                # (consumed within the operator after fusion)
                 intersection = set(operation_fusion_ids).intersection(set(input_indices))
 
                 # is the output input to other operators?
