@@ -3,7 +3,7 @@
 import copy
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import numpy
 import pandas
@@ -356,9 +356,8 @@ class memoryView:
     def generate_view(
             self,
             memory_size: int,
-            return_output: bool = False,
             plot_memory: bool = False
-    ) -> Union[None, list[dict]]:
+    ) -> list[dict]:
         # memory size (in MB)
         self.memory_size = memory_size
 
@@ -566,7 +565,7 @@ class memoryView:
 
                 self.log_memory_view.append(copy.deepcopy(self.memory_context))
 
-        save_object = copy.deepcopy(self.log_memory_view) if return_output else None
+        save_object = copy.deepcopy(self.log_memory_view)
 
         self.logData(self.log_files['memory_view'], self.log_memory_view)
 
@@ -598,7 +597,6 @@ class memoryView:
 
         log_memory_context = self.generate_view(
             memory_size=memory_size,
-            return_output=True,
             plot_memory=False
         )
 
