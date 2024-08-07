@@ -671,6 +671,8 @@ class memoryView:
                     next_input_id = input_indices[0]
                     imm_cachability = next_input_id - output_id
 
+                # if output is the final output,
+                # output is pushed to main memory
                 elif current_output in final_outputs:
                     self.main_memory_context = self.updateDict(
                         self.main_memory_context,
@@ -694,8 +696,7 @@ class memoryView:
                 if (len(intersection) != len(input_indices)
                     and self.evaluateOutput(frequency, imm_cachability)):
                     # if output memory size > cache size, the output needs to be pushed to main memory
-                    # if it is an input to other operators or if output is the final output,
-                    # output is pushed to main memory
+                    # if it is an input to other operators
                     if output_memory >= self.cache_size:
                         self.main_memory_context = self.updateDict(
                             self.main_memory_context,
