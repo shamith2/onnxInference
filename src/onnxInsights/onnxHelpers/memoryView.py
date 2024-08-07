@@ -3,7 +3,7 @@
 import copy
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 import numpy
 import pandas
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 __producer__ = "memoryView"
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 
 # memory view
@@ -25,9 +25,7 @@ class memoryView:
             self,
             model_dir: str,
             model_profile: str,
-            outputs_profile: str,
-            frequency_threshold: int = 1,
-            imm_cachability_threshold: int = 1
+            outputs_profile: str
     ):
         self.root = Path(__file__).parents[3].resolve()
         self.workspace = Path(__file__).parent.resolve()
@@ -49,25 +47,22 @@ class memoryView:
             'memory_view': os.path.join(self.mem_view_logs_directory, 'memory_view.json'),
             'cache_view': os.path.join(self.mem_view_logs_directory, 'cache_view.json'),
             'main_memory_context': os.path.join(self.mem_view_logs_directory,
-                                                'main_memory_context.json'),
-            'cache_main_memory_context': os.path.join(self.mem_view_logs_directory,
-                                                      'cache_main_memory_context.json'),
+                                                'main_memory_context.json')
         }
 
         # hyperparameters
-        self.frequency_threshold = frequency_threshold
-        self.imm_cachability_threshold = imm_cachability_threshold
+        self.frequency_threshold = 1
+        self.imm_cachability_threshold = 1
         self.rounding_decimal = 6
 
 
     def reset(
             self
     ) -> None:
-        self.log_cache_view = []
         self.log_memory_view = []
         self.log_memory_usage = []
+        self.log_cache_view = []
         self.log_cache_memory_usage = []
-        self.log_main_memory_context = []
 
         self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_dataframe_file))
         self.outputs_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.outputs_database_file))
@@ -79,14 +74,9 @@ class memoryView:
         self.memory_occupied = 0.0
 
         self.cache_parentKey = 'entries'
-
         self.cache_context = {self.cache_parentKey: {}}
-        self.local_memory = {}
-        self.main_memory_context = {}
 
         self.outputs_sequence = None
-        self.output_index_seq = None
-        self.output_freq_seq = None
 
 
     def updateDict(
@@ -142,12 +132,15 @@ class memoryView:
             frequency: int,
             imm_cachability: int
     ) -> bool:
-        if ((frequency >= self.frequency_threshold) and 
-            (imm_cachability >= self.imm_cachability_threshold)):
-            return True
+        if self.frequency_threshold > 1 or self.imm_cachability_threshold > 1:
+            logging.warning('frequency threshold or imm_cachablity threshold is greater than 1. check if it is intended')
+
+        if ((frequency <= self.frequency_threshold) and 
+            (imm_cachability <= self.imm_cachability_threshold)):
+            return False
 
         else:
-            return False
+            return True
 
 
     def evictKeyfromCache(
@@ -169,7 +162,7 @@ class memoryView:
         # needs to wait longer before it's used but high frequency
         # implies the output is used frequently
         self.cache_context[self.cache_parentKey] = dict(sorted(self.cache_context[self.cache_parentKey].items(),
-                                         key=lambda x: (x[1]['frequency'], -1 * x[1]['imm_cachability']),
+                                         key=lambda x: (x[1]['frequency'], -1 * x[1]['imm_cachability'], x[1]['memory']),
                                          reverse=True))
 
 
@@ -268,66 +261,36 @@ class memoryView:
     def updateCache(
             self,
             key: str,
-            input_indices: str,
-            value: tuple[int, float]
+            value: tuple[int, int, int, int, int, float]
     ) -> int:
-        input_indices = [int(elem) for elem in input_indices.split(' ')]
+        operator_id, output_id, next_input_id, frequency, imm_cachability, output_memory = value
 
-        frequency = self.output_freq_seq[self.outputs_sequence == key].item()
-        output_index = self.output_index_seq[self.outputs_sequence == key].item()
-        imm_cachability = input_indices[0] - output_index
-        
-        output_idx, output_memory = value
-        operator_idx = output_idx - 1
+        self.cache_occupied += output_memory
 
-        # evaluate if output is worth storing in cache
-        if self.evaluateOutput(frequency, imm_cachability):
-            self.cache_occupied += output_memory
-        
-        # if output is not worth storing in cache
-        # push it to main memory
-        else:
-            self.main_memory_context = self.updateDict(
-                self.main_memory_context,
-                subdict='outputs',
-                key=key,
-                value=output_memory,
-                overwrite=False
-            )
+        # if output cannot fit in cache, evit least priority output
+        # from cache which according to the sorting,
+        # which is the last entry of the cache context
+        while self.cache_occupied > self.cache_size:
+            dict_keys, dict_values = zip(*self.cache_context[self.cache_parentKey].items())
+            self.evictKeyfromCache(dict_keys[-1], dict_values[-1]['memory'])
 
-            return 1
+        # add output to cache
+        self.cache_context = self.updateDict(
+            self.cache_context,
+            subdict=self.cache_parentKey,
+            key=key,
+            value={
+                'operator_id': operator_id,
+                'output_id': output_id,
+                'next_input_id': next_input_id,
+                'frequency': frequency,
+                'imm_cachability': imm_cachability,
+                'memory': output_memory
+            },
+            overwrite=False
+        )
 
-        # if output can fit in cache, add it to cache
-        if self.cache_occupied < self.cache_size:
-            # add output to cache
-            self.cache_context = self.updateDict(
-                self.cache_context,
-                subdict=self.cache_parentKey,
-                key=key,
-                value={
-                    'output_id': output_idx,
-                    'frequency': frequency,
-                    'imm_cachability': imm_cachability,
-                    'memory': output_memory
-                },
-                overwrite=False
-            )
-
-            self.refreshCache()
-
-            # update input_indices for later use
-            updated_input_indices = input_indices[1:]
-            updated_input_indices = (' '.join([str(elem) for elem in updated_input_indices])
-                                    if updated_input_indices else numpy.nan)
-            
-            self.outputs_profile['Input Node Index'].at[operator_idx] = updated_input_indices
-
-        # else evit least priority output from cache which according to the sorting
-        # is the last entry of the cache context
-        else:
-            while self.cache_occupied < self.cache_size:
-                dict_keys, dict_values = zip(*self.cache_context[self.cache_parentKey].items())
-                self.evictKeyfromCache(dict_keys[-1], dict_values[-1]['memory'])
+        self.refreshCache()
 
         return 0
 
@@ -338,14 +301,13 @@ class memoryView:
     ) -> int:
         output_dict = self.cache_context[self.cache_parentKey][key]
 
-        output_idx = output_dict['output_id']
+        operator_id = output_dict['operator_id']
+        output_id = output_dict['output_id']
         frequency = output_dict['frequency']
-        imm_cachability = output_dict['imm_cachability']
         output_memory = output_dict['memory']
 
-        operator_idx = output_idx - 1
-
-        input_indices = self.outputs_profile['Input Node Index'].at[operator_idx]
+        output_idx = output_id - 1
+        input_indices = self.outputs_profile['Input Node Index'].at[output_idx]
 
         # if the key is no longer used as input to other operators,
         # discard it
@@ -359,12 +321,11 @@ class memoryView:
         updated_input_indices = (' '.join([str(elem) for elem in updated_input_indices])
                                 if updated_input_indices else numpy.nan)
         
-        self.outputs_profile['Input Node Index'].at[operator_idx] = updated_input_indices
+        self.outputs_profile['Input Node Index'].at[output_idx] = updated_input_indices
 
         frequency -= 1
-        # output_index = self.output_index_seq[self.outputs_sequence == key].item()
-        # assert output_index == output_idx
-        imm_cachability = input_indices[0] - output_idx
+        next_input_id = input_indices[0]
+        imm_cachability = next_input_id - output_dict['next_input_id']
 
         # evaluate if output is worth saving in the cache
         if self.evaluateOutput(frequency, imm_cachability):
@@ -373,7 +334,9 @@ class memoryView:
                     subdict=self.cache_parentKey,
                     key=key,
                     value={
-                        'output_id': output_idx,
+                        'operator_id': operator_id,
+                        'output_id': output_id,
+                        'next_input_id': next_input_id,
                         'frequency': frequency,
                         'imm_cachability': imm_cachability,
                         'memory': output_memory
@@ -385,25 +348,17 @@ class memoryView:
 
         else:
             self.evictKeyfromCache(key, output_memory)
-
-            self.main_memory_context = self.updateDict(
-                self.main_memory_context,
-                subdict='outputs',
-                key=key,
-                value=output_memory,
-                overwrite=False
-            )
-
             return 2
 
         return 0
 
 
-    def run_without_cache(
+    def generate_view(
             self,
             memory_size: int,
+            return_output: bool = False,
             plot_memory: bool = False
-    ) -> None:
+    ) -> Union[None, list[dict]]:
         # memory size (in MB)
         self.memory_size = memory_size
 
@@ -426,7 +381,7 @@ class memoryView:
 
         # operators are in sequence
         for operator_idx in range(sequence_length):
-            self.main_memory_context = {}
+            self.memory_context = {}
             _no_weights = False
 
             # current operator to be executed
@@ -436,8 +391,8 @@ class memoryView:
             compute_ops = round(float(compute_operations_sequence[operator_idx]) / 1e6,
                                 self.rounding_decimal)
 
-            self.main_memory_context = self.updateDict(
-                self.main_memory_context,
+            self.memory_context = self.updateDict(
+                self.memory_context,
                 subdict=None,
                 key='id',
                 value=(operator_idx + 1),
@@ -470,8 +425,8 @@ class memoryView:
             # yes, then, the operator can be fused provided
             # the memory size requirements are met
             if operator_idx > 0:
-                output_list = self.log_main_memory_context[-1]['outputs'].keys()
-                _prev_memory_adder = self.log_main_memory_context[-1]['total_memory']
+                output_list = self.log_memory_view[-1]['outputs'].keys()
+                _prev_memory_adder = self.log_memory_view[-1]['total_memory']
 
                 for i, op_input in enumerate(op_inputs):
                     if op_input and (op_input in output_list):
@@ -487,10 +442,10 @@ class memoryView:
 
             if _prev_memory_adder + inst_total_memory < self.memory_size:
                 if operator_idx > 0:
-                    self.main_memory_context = self.log_main_memory_context[-1]
+                    self.memory_context = self.log_memory_view[-1]
 
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict=None,
                     key='id',
                     value=operator_idx + 1,
@@ -498,8 +453,8 @@ class memoryView:
                 )
 
                 # compute operators for operator
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict=None,
                     key='compute',
                     value=compute_ops,
@@ -510,8 +465,8 @@ class memoryView:
                 if _no_weights:
                     for i in range(len(op_inputs)):
                         if op_inputs[i] and inputs_memory[i]:
-                            self.main_memory_context = self.updateDict(
-                                self.main_memory_context,
+                            self.memory_context = self.updateDict(
+                                self.memory_context,
                                 subdict='inputs',
                                 key=op_inputs[i],
                                 value=inputs_memory[i],
@@ -519,8 +474,8 @@ class memoryView:
                             )
 
                 else:
-                    self.main_memory_context = self.updateDict(
-                        self.main_memory_context,
+                    self.memory_context = self.updateDict(
+                        self.memory_context,
                         subdict='weights',
                         key=op_weights,
                         value=weights_memory,
@@ -528,8 +483,8 @@ class memoryView:
                     )
 
                 # output to main memory
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict='outputs',
                     key=current_output,
                     value=output_memory,
@@ -537,8 +492,8 @@ class memoryView:
                 )
 
                 # output to main memory
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict=None,
                     key='total_memory',
                     value=inst_total_memory,
@@ -547,7 +502,7 @@ class memoryView:
                 )
 
                 if operator_idx > 0:
-                    self.log_main_memory_context[-1] = self.main_memory_context
+                    self.log_memory_view[-1] = self.memory_context
 
             else:
                 op_inputs = _input_metadata[0]
@@ -558,8 +513,8 @@ class memoryView:
                     # get inputs for operator from main memory
                     for i in range(len(op_inputs)):
                         if op_inputs[i] and inputs_memory[i]:
-                            self.main_memory_context = self.updateDict(
-                                self.main_memory_context,
+                            self.memory_context = self.updateDict(
+                                self.memory_context,
                                 subdict='inputs',
                                 key=op_inputs[i],
                                 value=inputs_memory[i],
@@ -567,12 +522,12 @@ class memoryView:
                             )
 
                 else:
-                    self.main_memory_context['inputs'] = {}
+                    self.memory_context['inputs'] = {}
 
                 if not _no_weights:
                     # get weights for operator from main memory
-                    self.main_memory_context = self.updateDict(
-                        self.main_memory_context,
+                    self.memory_context = self.updateDict(
+                        self.memory_context,
                         subdict='weights',
                         key=op_weights,
                         value=weights_memory,
@@ -580,11 +535,11 @@ class memoryView:
                     )
 
                 else:
-                    self.main_memory_context['weights'] = {}
+                    self.memory_context['weights'] = {}
 
                 # output to main memory
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict='outputs',
                     key=current_output,
                     value=output_memory,
@@ -592,8 +547,8 @@ class memoryView:
                 )
 
                 # compute operators for operator
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict=None,
                     key='compute',
                     value=compute_ops,
@@ -601,21 +556,23 @@ class memoryView:
                 )
 
                 # output to main memory
-                self.main_memory_context = self.updateDict(
-                    self.main_memory_context,
+                self.memory_context = self.updateDict(
+                    self.memory_context,
                     subdict=None,
                     key='total_memory',
                     value=inst_total_memory,
                     overwrite=False
                 )
 
-                self.log_main_memory_context.append(self.main_memory_context)
+                self.log_memory_view.append(copy.deepcopy(self.memory_context))
 
-        self.logData(self.log_files['main_memory_context'], self.log_main_memory_context)
+        save_object = copy.deepcopy(self.log_memory_view) if return_output else None
+
+        self.logData(self.log_files['memory_view'], self.log_memory_view)
 
         if plot_memory:
             # memory usage
-            for entry in self.log_main_memory_context:
+            for entry in self.log_memory_view:
                 self.log_memory_usage.append(entry['total_memory'])
 
             self.plotMemory(
@@ -626,130 +583,181 @@ class memoryView:
                 display=True
             )
 
+        return save_object
+
 
     def run_with_cache(
             self,
             cache_size: int,
+            final_outputs: tuple,
             plot_memory: bool = False
     ) -> None:
         # cache size (in MB)
         self.cache_size = cache_size
 
+        log_memory_context = self.generate_view(
+            memory_size=3,
+            return_output=True,
+            plot_memory=False
+        )
+
         self.reset()
 
-        operators_sequence = self.model_profile['Node']
-
-        inputs_sequence = self.model_profile['Inputs Name']
-        inputs_memory_seq = self.model_profile['Inputs Memory (in MB)']
-        
+        operators_sequence = log_memory_context   
         self.outputs_sequence = self.outputs_profile['Output Name']
-        outputs_memory_seq = self.outputs_profile['Memory (in MB)']
-
-        self.output_index_seq = self.outputs_profile['Output Node Index']
-        self.output_freq_seq = self.outputs_profile['Frequency']
-
-        # assert sequence_length == len(outputs_sequence)
-        sequence_length = len(operators_sequence)
 
         # operators are in sequence
-        for operator_idx in range(sequence_length):
-            self.main_memory_context = {}
+        for operator_idx, memory_profile in enumerate(operators_sequence):
+            self.main_memory_context = {'id': operator_idx + 1, 'inputs': {}, 'outputs': {}}
 
-            # current operator to be executed
-            _ = operators_sequence[operator_idx]
+            # operator fusion ids
+            operation_fusion_ids = memory_profile['id']
+
+            if isinstance(operation_fusion_ids, int):
+                operation_fusion_ids = (operation_fusion_ids,)
+
+            else:
+                operation_fusion_ids = tuple(operation_fusion_ids)
 
             # inputs for operator
-            op_inputs = inputs_sequence.at[operator_idx]
-            inputs_memory = inputs_memory_seq.at[operator_idx]
+            op_inputs = list(memory_profile['inputs'].keys())
+            inputs_memory = list(memory_profile['inputs'].values())
 
-            if ((not isinstance(op_inputs, str) or not isinstance(inputs_memory, str)) 
-                or (operator_idx == sequence_length - 1)):
-                continue
+            # weights for operator
+            op_weights = list(memory_profile['weights'].keys())
+            weights_memory = list(memory_profile['weights'].values())
 
             # if inputs are not in cache, they have to
             # be pulled from main memory
-            for op_input in op_inputs.split(' '):
+            for i, op_input in enumerate(op_inputs):
                 # if output is in cache, retrieve it from cache
                 if self.checkKeyinDict(self.cache_context[self.cache_parentKey], op_input):
                     _ = self.retrieveKeyfromCache(op_input)
 
                 else:
                     # input should be pulled in from main memory
-                    pass
+                    self.main_memory_context = self.updateDict(
+                        self.main_memory_context,
+                        subdict='inputs',
+                        key=op_input,
+                        value=inputs_memory[i],
+                        overwrite=False
+                    )
 
-            # execute current operator
-            _ = operators_sequence[operator_idx]
-
-            self.main_memory_context = self.updateDict(
-                self.main_memory_context,
-                subdict=None,
-                key='id',
-                value=(operator_idx + 1),
-                overwrite=False
-            )
-
-            # current operator generates output
-            current_output = self.outputs_sequence[operator_idx]
-            output_memory = outputs_memory_seq[operator_idx]
-
-            # is the output input to other operators?
-            input_indices = self.outputs_profile['Input Node Index'][operator_idx]
-
-            # if no, output can be discarded
-            if not isinstance(input_indices, str):
-                continue
-
-            # if output memory size > cache size, the output needs
-            # to be pushed to main memory if it is an input to other
-            # operators
-            if (output_memory >= self.cache_size):
+            # weights should be pulled in from main memory
+            for w, op_weight in enumerate(op_weights):
                 self.main_memory_context = self.updateDict(
                     self.main_memory_context,
-                    subdict='outputs',
-                    key=current_output,
-                    value=output_memory,
+                    subdict='weights',
+                    key=op_weight,
+                    value=weights_memory[w],
                     overwrite=False
                 )
 
-            else:
-                # else check if the output can be cached and cache it
-                if not self.checkKeyinDict(self.cache_context[self.cache_parentKey], current_output):
-                    _ = self.updateCache(
-                        current_output,
-                        input_indices,
-                        (operator_idx + 1, output_memory)
+            # current operator generates output
+            current_outputs = list(memory_profile['outputs'].keys())
+            outputs_memory = list(memory_profile['outputs'].values())
+
+            for output_idx, current_output in enumerate(current_outputs):
+                output_memory = outputs_memory[output_idx]
+
+                track_output_entry = self.outputs_profile[self.outputs_profile['Output Name'] == current_output]
+
+                output_id = track_output_entry.index.item() + 1
+                input_indices = track_output_entry['Input Node Index'].item()
+                frequency = track_output_entry['Frequency'].item()
+
+                if isinstance(input_indices, str):
+                    input_indices = [int(elem) for elem in input_indices.split(' ')]
+                    next_input_id = input_indices[0]
+                    imm_cachability = next_input_id - output_id
+
+                elif current_output in final_outputs:
+                    self.main_memory_context = self.updateDict(
+                        self.main_memory_context,
+                        subdict='outputs',
+                        key=current_output,
+                        value=output_memory,
+                        overwrite=False
                     )
+
+                    continue
+
+                else:
+                    continue
+
+                # check if output is an intermediate output
+                # (consumed within the operation fusion)
+                intersection = set(operation_fusion_ids).intersection(set(input_indices))
+
+                # is the output input to other operators?
+                # if no, output can be discarded
+                if (len(intersection) != len(input_indices)
+                    and self.evaluateOutput(frequency, imm_cachability)):
+                    # if output memory size > cache size, the output needs to be pushed to main memory
+                    # if it is an input to other operators or if output is the final output,
+                    # output is pushed to main memory
+                    if output_memory >= self.cache_size:
+                        self.main_memory_context = self.updateDict(
+                            self.main_memory_context,
+                            subdict='outputs',
+                            key=current_output,
+                            value=output_memory,
+                            overwrite=False
+                        )
+
+                    else:
+                        # else check if the output can be cached and cache it
+                        if not self.checkKeyinDict(self.cache_context[self.cache_parentKey], current_output):
+                            _ = self.updateCache(
+                                current_output,
+                                (operator_idx + 1, output_id, next_input_id, frequency, imm_cachability, output_memory)
+                            )
+
+                            # update input_indices for later use
+                            updated_input_indices = input_indices[1:]
+                            updated_input_indices = (' '.join([str(elem) for elem in updated_input_indices])
+                                                    if updated_input_indices else numpy.nan)
+
+                            self.outputs_profile['Input Node Index'].at[output_idx] = updated_input_indices
+
 
             self.cache_context = self.updateDict(
                 self.cache_context,
                 subdict=None,
                 key='cache_occupied',
-                value=self.cache_occupied,
+                value=round(self.cache_occupied, self.rounding_decimal),
                 overwrite=True
             )
 
             # log data
             self.log_cache_view.append(copy.deepcopy(self.cache_context))
 
-            try:
-                _ = self.main_memory_context['outputs']
-                self.log_main_memory_context.append(self.main_memory_context)
-            except KeyError:
-                pass
+            # read and write memory
+            total_read_memory = (sum(list(self.main_memory_context['inputs'].values()))
+                                 + sum(weights_memory))
 
-        # the last output needs to go to main memory
-        self.main_memory_context = self.updateDict(
-            self.main_memory_context,
-            subdict='outputs',
-            key=self.outputs_sequence[sequence_length - 1],
-            value=outputs_memory_seq[sequence_length - 1],
-            overwrite=False
-        )
+            self.main_memory_context = self.updateDict(
+                self.main_memory_context,
+                subdict=None,
+                key='total_read_memory',
+                value=round(total_read_memory, self.rounding_decimal),
+                overwrite=False
+            )
 
-        self.log_main_memory_context.append(self.main_memory_context)
+            self.main_memory_context = self.updateDict(
+                self.main_memory_context,
+                subdict=None,
+                key='total_write_memory',
+                value=round(sum(list(self.main_memory_context['outputs'].values())),
+                            self.rounding_decimal),
+                overwrite=False
+            )
+
+            self.log_memory_view.append(copy.deepcopy(self.main_memory_context))
 
         self.logData(self.log_files['cache_view'], self.log_cache_view)
-        self.logData(self.log_files['cache_main_memory_context'], self.log_main_memory_context)
+        self.logData(self.log_files['main_memory_context'], self.log_memory_view)
 
         if plot_memory:
             # memory usage
