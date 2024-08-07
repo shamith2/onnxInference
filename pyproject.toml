@@ -17,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License"
 ]
-requires-python = ">= 3.9"
+requires-python = ">= 3.10"
 dependencies = [
     "pip",
     "tzdata",
@@ -29,21 +29,22 @@ dependencies = [
     "onnxruntime",
     "torch",
     "matplotlib",
-    "pandas"
+    "pandas",
+    "opencv-python",
+    "pyautogui",
+    "imagehash",
+    "keyboard"
 ]
 
 [project.optional-dependencies]
 pipelines = [
+    "onnxruntime-directml",
     "optimum",
     "diffusers",
     "scipy",
     "accelerate",
     "tqdm",
-    "psutil",
-    "opencv-python",
-    "pyautogui",
-    "imagehash",
-    "keyboard"
+    "psutil"
 ]
 
 [tool.hatch.version]
