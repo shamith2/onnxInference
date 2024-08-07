@@ -576,7 +576,7 @@ class memoryView:
 
             self.plotMemory(
                 self.log_memory_usage,
-                self.memory_size,
+                None,
                 None,
                 steps=None,
                 display=True
