@@ -83,7 +83,8 @@ local_memory_view = memoryView(
 )
 
 local_memory_view.run_with_cache(
-    cache_size=3,
+    memory_size=3,
+    cache_size=0,
     final_outputs=('logits'),
     plot_memory=True
 )
