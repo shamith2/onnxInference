@@ -61,9 +61,6 @@ class memoryView:
     def reset(
             self
     ) -> None:
-        self.log_memory_view = []
-        self.log_cache_view = []
-
         self.model_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.model_dataframe_file))
         self.outputs_profile = pandas.read_csv(os.path.join(self.profile_logs_directory, self.outputs_database_file))
 
@@ -74,6 +71,8 @@ class memoryView:
         self.memory_occupied = 0.0
         self.local_memory_used = 0.0
 
+        self.log_memory_view = []
+        self.log_cache_view = []
         self.store_input_id = {}
 
         self.cache_parentKey = 'entries'
@@ -284,11 +283,12 @@ class memoryView:
             axis.set_xlabel(attributes[i]['xlabel'])      
             axis.set_ylabel(attributes[i]['ylabel'])
 
-            fig.suptitle(attributes[i]['suptitle'], fontweight='bold')
             axis.set_title(attributes[i]['figtitle'])
 
             axis.legend(loc='best')
             axis.tick_params(bottom=True, labelbottom=False)
+
+        fig.suptitle(attributes[0]['suptitle'], fontweight='bold')
 
         plt.tight_layout()
 
@@ -1062,7 +1062,7 @@ class memoryView:
                 'xlabel': 'Timestep',
                 'ylabel': 'Memory used [in MB]',
                 'legend': 'cache occupied',
-                'suptitle': 'Cache Profile\n',
+                'suptitle': 'Local Output Memory and Cache Profile\n',
                 'figtitle': 'Cache Memory = Outputs Memory'
             }
 
@@ -1070,7 +1070,6 @@ class memoryView:
                 'xlabel': 'Timestep',
                 'ylabel': 'Memory used [in MB]',
                 'legend': 'local memory\noccupied',
-                'suptitle': 'Local Output Memory and Cache Profile\n',
                 'figtitle': '\nLocal Output Memory = Outputs Memory'
             }
 
@@ -1078,7 +1077,7 @@ class memoryView:
                 'xlabel': 'Timestep',
                 'ylabel': 'Memory [in MB]',
                 'legend': 'read memory',
-                'suptitle': 'Operator Read Memory\n',
+                'suptitle': 'Operator Read and Write Memory\n',
                 'figtitle': 'Read Memory = Inputs Memory + Weights Memory'
             }
 
@@ -1086,7 +1085,6 @@ class memoryView:
                 'xlabel': 'Timestep',
                 'ylabel': 'Memory [in MB]',
                 'legend': 'write memory',
-                'suptitle': 'Operator Write Memory\n',
                 'figtitle': '\nWrite Memory = Outputs Memory'
             }
 
