@@ -150,7 +150,7 @@ class memoryView:
         """
 
         if self.frequency_threshold > 1 or self.imm_cachability_threshold > 1:
-            logging.warning('frequency threshold or imm_cachablity threshold is greater than 1. check if it is intended')
+            logging.warning('frequency threshold or imm_cachablity threshold is greater than 1. check if this is intended')
 
         if imm_cachability <= self.imm_cachability_threshold:
             return 'local_memory'
