@@ -1,4 +1,5 @@
 # This script contains functions for converting PyTorch model to ONNX, benchmarking ONNX models using ONNXRuntime, Quantizing and Performance Analysis of ONNX models
+# Update for RyzenAI v1.2.0
 
 from collections import deque
 from datetime import datetime
@@ -29,16 +30,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 __producer__ = "onnxBenchmark"
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 
 # global functions
-def check_install_dir(voe_dir: str):
-    if not os.path.exists(os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)):
-        raise Exception("Invalid VOE installation: voe-4.0-win_amd64 or voe-win_amd64-latest missing")
-        sys.exit(9)
-    
-    return True
 
 # infer the numpy dtype for inputs and outputs
 def get_numpy_dtype(input_type: str):
@@ -204,11 +199,12 @@ class ONNXInference:
             model_name: str = None,
             metadata: str = 'test',
             model_path: Optional[str] = None,
+            config_file_dir: Optional[str] = None,
+            xclbin_dir: Optional[str] = None,
             mode: Optional[str] = None
     ):
         if model_name is None:
             raise Exception("model_name cannot be None")
-            sys.exit(1)
 
         self.model_name = str(model_name)
 
@@ -217,11 +213,16 @@ class ONNXInference:
         self.workspace = os.path.join(self.working_dir, 'onnx')
         self.cache_dir = os.path.join(self.workspace, '.cache')
 
-        self.config_file_dir = None
-        self.xclbin_dir = None
+        self.default_voe_dir = os.path.join('C:\\', 'Program Files', 'RyzenAI', '1.2.0', 'voe-4.0-win_amd64')
+
+        if not config_file_dir:
+            self.config_file_dir = self.default_voe_dir
+
+        if not xclbin_dir:
+            self.xclbin_dir = os.path.join(self.default_voe_dir, 'xclbins', 'strix')
+
         self.instance_count = None
         self.runtime = None
-        self.iterations = None
         self.opset_version = None
         self.use_external_data = None
 
@@ -248,7 +249,6 @@ class ONNXInference:
 
             if mode not in ['fp32', 'int8', 'ryzen-ai', 'cache']:
                 raise Exception("mode has to be either fp32 or int8 or ryzen-ai or cache")
-                sys.exit(2)
 
             if mode == 'fp32':
                 to_path = os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
@@ -274,7 +274,6 @@ class ONNXInference:
                 
                 else:
                     raise Exception("If mode is cache, then model_path has to be a directory")
-                    sys.exit(3)
 
     def convert_torch_to_onnx(self,
                               model: torch.nn.Module,
@@ -306,7 +305,6 @@ class ONNXInference:
 
         if not isinstance(model, torch.nn.Module):
             raise Exception("[ERROR] Model has to be of type torch.nn.Module")
-            sys.exit(4)
 
         if os.path.exists(self.fp32_onnx_dir):
             if not exist_ok:
@@ -325,12 +323,10 @@ class ONNXInference:
 
         if pass_inputs and model_inputs is None:
             raise Exception("Input cannot be None")
-            sys.exit(5)
 
         if not pass_inputs:
             if input_shape is None:
                 raise Exception("Input shape cannot be None")
-                sys.exit(6)
 
             else:
                 model_inputs = tuple(torch.randn(*input_shape, requires_grad=False))
@@ -402,7 +398,6 @@ class ONNXInference:
 
         except onnx.checker.ValidationError as e:
             raise Exception(e)
-            sys.exit(7)
 
         logger.info("Successfully converted PyTorch model to ONNX!!\n")
 
@@ -477,7 +472,6 @@ class ONNXInference:
 
         except onnx.checker.ValidationError as e:
             raise Exception(e)
-            sys.exit(8)
 
         logger.info("Successfully quantized onnx model!!\n")
 
@@ -521,11 +515,10 @@ class ONNXInference:
                         profiling: bool = False,
                         disable_thread_spinning: bool = True,
                         runtime: int = 60,
-                        iterations: Optional[int] = None,
                         num_threads: int = 8,
                         inf_mode: str = 'fp32',
                         verbosity: int = 3,
-                        intra_threads: int = 0
+                        intra_threads: int = 1
     ):
         if inf_mode == 'ryzen-ai':
             onnx_model_path = os.path.join(self.ryzen_ai_onnx_dir, self.model_name + '_int8.onnx')
@@ -569,12 +562,6 @@ class ONNXInference:
 
         # ryzen-ai := int8 on ryzen ai processor
         if inf_mode == 'ryzen-ai':
-            voe_dir = 'voe-win_amd64-latest'
-            check_install_dir(voe_dir)
-
-            self.config_file_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)
-            self.xclbin_dir = os.path.join(os.environ['RYZEN_AI_INSTALLER'], voe_dir)
-
             if layout == '1x4':
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_Nx4_Overlay.xclbin')
                 os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 8))
@@ -585,22 +572,20 @@ class ONNXInference:
 
             else:
                 raise Exception("Invalid Layout parameter: should be 1x4 or 4x4")
-                sys.exit(10)
 
             os.environ['XLNX_ENABLE_CACHE'] = '1'            
             os.environ['XLNX_ONNX_EP_VERBOSE'] = '1' if compile_only else '0'
             os.environ['XLNX_ENABLE_STAT_LOG'] = '0'
 
             if config_file_name is None:
-                config_file_name = 'vaip_config_1x4.json'
+                config_file_name = 'vaip_config.json'
             else:
-                config_file_name = config_file_name + '_' + layout + '.json'
+                config_file_name = config_file_name + '.json'
 
             config_file_path = os.path.join(self.config_file_dir, str(config_file_name))
 
             if not os.path.exists(config_file_path):
                 raise Exception("Cannot find {} in {}".format(config_file_name, config_file_path))
-                sys.exit(11)
 
             ort_session = ort.InferenceSession(
                 onnx_model_path,
@@ -618,7 +603,6 @@ class ONNXInference:
             if "VitisAIExecutionProvider" not in ort_session.get_providers():
                 raise EnvironmentError(
                     "ONNXRuntime does not support VitisAIExecutionProvider. Build ONNXRuntime appropriately")
-                sys.exit(12)
 
             # IPU compilation takes place when the session is created
             logger.info("Model compiled successfully!!\n")
