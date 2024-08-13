@@ -19,8 +19,6 @@ from concurrent.futures import wait, ThreadPoolExecutor
 import functools
 
 import onnx
-from onnx import version_converter
-
 import onnxruntime as ort
 from onnxruntime.quantization import QuantFormat, QuantType, CalibrationDataReader
 from onnxruntime.quantization.shape_inference import quant_pre_process
@@ -287,7 +285,7 @@ class ONNXInference:
                               output_names: Optional[list] = None,
                               input_dynamic_axes: Optional[list[dict]] = None,
                               output_dynamic_axes: Optional[list[dict]] = None,
-                              opset_version: int = 17,
+                              opset_version: int = OPSET_VERSION,
                               use_dynamo: bool = False,
                               use_external_data: bool = False,
                               exist_ok: bool = True,
@@ -434,7 +432,7 @@ class ONNXInference:
             logging.info("Changing model opset version to {}\n".format(OPSET_VERSION))
 
             updated_model_path = input_model_path[:-5] + '_op' + str(OPSET_VERSION) + '.onnx'
-            converted_model = version_converter.convert_version(original_model, OPSET_VERSION)
+            converted_model = onnx.version_converter.convert_version(original_model, OPSET_VERSION)
             onnx.save(converted_model, updated_model_path)
 
         else:
