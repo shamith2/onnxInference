@@ -19,6 +19,8 @@ from concurrent.futures import wait, ThreadPoolExecutor
 import functools
 
 import onnx
+from onnx import version_converter
+
 import onnxruntime as ort
 from onnxruntime.quantization import QuantFormat, QuantType, CalibrationDataReader
 from onnxruntime.quantization.shape_inference import quant_pre_process
@@ -31,6 +33,10 @@ logger = logging.getLogger(__name__)
 
 __producer__ = "onnxBenchmark"
 __version__ = "1.2.0"
+
+
+# global variables
+OPSET_VERSION = 17
 
 
 # global functions
@@ -97,10 +103,7 @@ class ImageCalibrationData(CalibrationDataReader):
 
         self.input_dict = {}
         for _input in dummy_session.get_inputs():
-            if self.calib_dataset and is_nchw(_input.shape):
-                self.input_dict[str(_input.name)] = (self.convert_nchw_to_nhwc_shape(_input.shape), _input.type)
-            else:
-                self.input_dict[str(_input.name)] = (_input.shape, _input.type)
+            self.input_dict[str(_input.name)] = (_input.shape, _input.type)
 
         if batch_size != 1:
             logger.warning("\nbatch size has to be 1. Setting batch size to 1 ...\n")
@@ -293,10 +296,10 @@ class ONNXInference:
             self.opset_version = opset_version
             self.use_external_data = use_external_data
 
-            if self.opset_version > 17:
-                logger.warning("Opset version cannot be greater than 17 if not using torch dynamo. Setting opset "
-                               "version to 17 ...\n")
-                self.opset_version = 17
+            if self.opset_version > OPSET_VERSION:
+                logger.warning("Opset version cannot be greater than {} if not using torch dynamo. Setting opset "
+                               "version to {} ...\n".format(OPSET_VERSION, OPSET_VERSION))
+                self.opset_version = OPSET_VERSION
 
         else:
             logger.warning("Dynamic Axes might not work as intended\n")
@@ -405,19 +408,47 @@ class ONNXInference:
 
     def quantize(
             self,
+            model_type: str,
             shape_infer: bool = True,
             external_data_format: bool = False
     ) -> int:
         import vai_q_onnx
 
+        if model_type not in ['cnn', 'transformer']:
+            raise Exception("model_type has to be either cnn or transformer")
+        
+        if model_type == 'cnn':
+            is_cnn = True
+            is_transformer = False
+        else:
+            is_cnn = False
+            is_transformer = True
+
         input_model_path = os.path.join(self.fp32_onnx_dir, self.model_name + '.onnx')
+
+        # check model opset
+        original_model = onnx.load(input_model_path)
+        opset_version = original_model.opset_import[0].version
+
+        if opset_version < OPSET_VERSION:
+            logging.info("Changing model opset version to {}\n".format(OPSET_VERSION))
+
+            updated_model_path = input_model_path[:-5] + '_op' + str(OPSET_VERSION) + '.onnx'
+            converted_model = version_converter.convert_version(original_model, OPSET_VERSION)
+            onnx.save(converted_model, updated_model_path)
+
+        else:
+            updated_model_path = input_model_path
+
+        del original_model
+        gc.collect()
 
         # configure model paths
         if shape_infer:
             infer_model_path = os.path.join(self.fp32_infer_onnx_dir, self.model_name + '_infer.onnx')
 
         else:
-            infer_model_path = input_model_path
+            infer_model_path = updated_model_path
 
         external_data_location = os.path.dirname(infer_model_path) if external_data_format else None
 
@@ -428,7 +459,7 @@ class ONNXInference:
             logger.info("Performing Shape Inference ...\n")
 
             quant_pre_process(
-                input_model_path,
+                updated_model_path,
                 infer_model_path,
                 skip_optimization=external_data_format,
                 skip_onnx_shape=False,
@@ -448,7 +479,6 @@ class ONNXInference:
         for _input in dummy_session.get_inputs():
             if is_nchw(_input.shape):
                 is_model_nchw = True
-            
             else:
                 is_model_nchw = False
 
@@ -460,10 +490,13 @@ class ONNXInference:
             calibration_data_reader=ImageCalibrationData(infer_model_path, 5, 1, 1, True),
             quant_format=QuantFormat.QDQ,
             calibrate_method=vai_q_onnx.PowerOfTwoMethod.MinMSE,
-            activation_type=QuantType.QInt8,
+            activation_type=QuantType.QUInt8,
             weight_type=QuantType.QInt8,
-            enable_ipu_cnn=True,  # option for model running on ipu
-            extra_options={'ActivationSymmetric': True},
+            enable_ipu_cnn=is_cnn,
+            enable_ipu_transformer=is_transformer,
+            extra_options={
+                'ActivationSymmetric': True
+            },
             convert_nchw_to_nhwc=is_model_nchw,
         )
 
@@ -564,11 +597,11 @@ class ONNXInference:
         if inf_mode == 'ryzen-ai':
             if layout == '1x4':
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_Nx4_Overlay.xclbin')
-                os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 8))
+                num_of_dpu_runners = str(min(self.instance_count, 8))
 
             elif layout == '4x4':
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_4x4_Overlay.xclbin')
-                os.environ['NUM_OF_DPU_RUNNERS'] = str(min(self.instance_count, 2))
+                num_of_dpu_runners = str(min(self.instance_count, 2))
 
             else:
                 raise Exception("Invalid Layout parameter: should be 1x4 or 4x4")
@@ -580,9 +613,9 @@ class ONNXInference:
             if config_file_name is None:
                 config_file_name = 'vaip_config.json'
             else:
-                config_file_name = config_file_name + '.json'
+                config_file_name = str(config_file_name) + '.json'
 
-            config_file_path = os.path.join(self.config_file_dir, str(config_file_name))
+            config_file_path = os.path.join(self.config_file_dir, config_file_name)
 
             if not os.path.exists(config_file_path):
                 raise Exception("Cannot find {} in {}".format(config_file_name, config_file_path))
@@ -596,6 +629,7 @@ class ONNXInference:
                         "config_file": config_file_path,
                         "cacheDir": self.cache_dir,
                         "cacheKey": self.model_name + '_ryzen_ai_' + str(config_file_name)[:-5],
+                        "num_of_dpu_runners": num_of_dpu_runners
                     },
                 ],
             )
@@ -604,12 +638,12 @@ class ONNXInference:
                 raise EnvironmentError(
                     "ONNXRuntime does not support VitisAIExecutionProvider. Build ONNXRuntime appropriately")
 
-            # IPU compilation takes place when the session is created
+            # NPU compilation takes place when the session is created
             logger.info("Model compiled successfully!!\n")
 
         else:
             config_file_path = None
-            cache_dir = None
+            self.cache_dir = None
 
             ort_session = ort.InferenceSession(
                 onnx_model_path,
