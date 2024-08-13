@@ -215,7 +215,6 @@ class ONNXInference:
         self.cache_dir = os.path.join(self.workspace, '.cache')
 
         self.default_voe_dir = os.path.join('C:\\', 'Program Files', 'RyzenAI', '1.2.0', 'voe-4.0-win_amd64')
-
         self.config_file_dir = self.default_voe_dir if not config_file_dir else config_file_dir
         self.xclbin_dir = os.path.join(self.default_voe_dir, 'xclbins', 'strix') if not xclbin_dir else xclbin_dir
 
