@@ -3,7 +3,7 @@
 import copy
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Union, Optional
 
 import numpy
 import pandas
@@ -38,8 +38,10 @@ class memoryView:
         self.profile_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir)
         self.mem_view_logs_directory = os.path.join(self.prof_directory, 'logs', model_dir,
                                                     'memoryView')
+        self.plots_directory = os.path.join(self.prof_directory, 'logs', model_dir,
+                                            'memoryView', 'plots')
 
-        for p in [self.prof_directory, self.mem_view_logs_directory]:
+        for p in [self.prof_directory, self.mem_view_logs_directory, self.plots_directory]:
             if not os.path.exists(p):
                 os.makedirs(p)
 
@@ -201,6 +203,7 @@ class memoryView:
 
     def plotMemory(
             self,
+            save_path: str,
             first_variable: list,
             second_variable: list,
             attributes: tuple[dict],
@@ -208,10 +211,9 @@ class memoryView:
             max_val: float,
             steps: int,
             fig_size: tuple[int],
-            for_cache: bool = False,
-            display: bool = False
+            for_cache: bool = False
     ) -> None:
-        if not for_cache:
+        if not for_cache and second_variable:
             logging.warning("second_variable should be None if not for_cache. Setting second_variable to None")
             second_variable = None
 
@@ -292,11 +294,10 @@ class memoryView:
 
         plt.tight_layout()
 
-        if display:
-            plt.show()
+        if save_path:
+            fig.savefig(save_path)
 
-        else:
-            plt.close(fig)
+        plt.close(fig)
 
 
     def evictKeyfromCache(
@@ -612,6 +613,7 @@ class memoryView:
     def generate_view(
             self,
             memory_size: int,
+            save_path: Optional[str] = None,
             plot_memory: bool = False
     ) -> list[dict]:
         # memory size (in MB)
@@ -836,20 +838,20 @@ class memoryView:
                 'xlabel': 'Operator',
                 'ylabel': 'Total Memory Size [in MB]',
                 'legend': 'total memory',
-                'suptitle': 'Memory Profile\n',
-                'figtitle': 'Total Memory = Inputs Memory + Weights Memory + Outputs Memory'
+                'suptitle': 'Memory Profile',
+                'figtitle': '\nTotal Memory = Inputs Memory + Weights Memory + Outputs Memory'
             }
 
             self.plotMemory(
-                self.log_memory_usage,
+                save_path=save_path,
+                first_variable=self.log_memory_usage,
                 second_variable=None,
                 attributes=(attributes,),
                 min_val=None,
                 max_val=None,
                 steps=None,
                 fig_size=(15, 12),
-                for_cache=False,
-                display=True
+                for_cache=False
             )
 
         return save_object
@@ -868,7 +870,9 @@ class memoryView:
 
         log_memory_context = self.generate_view(
             memory_size=local_memory_size,
-            plot_memory=False
+            save_path=os.path.join(self.plots_directory,
+                                   'local_memory_view_for_lmsz{}mb.png'.format(local_memory_size)),
+            plot_memory=True,
         )
 
         self.recalculateInputIndices(log_memory_context)
@@ -1062,8 +1066,8 @@ class memoryView:
                 'xlabel': 'Timestep',
                 'ylabel': 'Memory used [in MB]',
                 'legend': 'cache occupied',
-                'suptitle': 'Local Output Memory and Cache Profile\n',
-                'figtitle': 'Cache Memory = Outputs Memory'
+                'suptitle': 'Local Output Memory and Cache Profile',
+                'figtitle': '\nCache Memory = Outputs Memory'
             }
 
             attributes_2 = {
@@ -1077,8 +1081,8 @@ class memoryView:
                 'xlabel': 'Timestep',
                 'ylabel': 'Memory [in MB]',
                 'legend': 'read memory',
-                'suptitle': 'Operator Read and Write Memory\n',
-                'figtitle': 'Read Memory = Inputs Memory + Weights Memory'
+                'suptitle': 'Operator Reads and Writes to Main Memory',
+                'figtitle': '\nRead Memory = Inputs Memory + Weights Memory'
             }
 
             attributes_4 = {
@@ -1089,26 +1093,28 @@ class memoryView:
             }
 
             self.plotMemory(
-                self.log_cache_memory_usage,
+                save_path=os.path.join(self.plots_directory,
+                                       'cache_and_local_memory_usage_for_csz{}mb_lmsz{}mb.png'.format(cache_size, local_memory_size)),
+                first_variable=self.log_cache_memory_usage,
                 second_variable=self.log_local_memory_usage,
                 attributes=(attributes_1, attributes_2),
                 min_val=None,
                 max_val=None,
                 steps=20,
                 fig_size=(15, 12),
-                for_cache=True,
-                display=True
+                for_cache=True
             )
 
             self.plotMemory(
-                self.log_reads,
+                save_path=os.path.join(self.plots_directory,
+                                       'reads_and_writes_to_main_memory_for_csz{}mb_lmsz{}mb.png'.format(cache_size, local_memory_size)),
+                first_variable=self.log_reads,
                 second_variable=self.log_writes,
                 attributes=(attributes_3, attributes_4),
                 min_val=None,
                 max_val=None,
                 steps=20,
                 fig_size=(15, 12),
-                for_cache=True,
-                display=True
+                for_cache=True
             )
 
