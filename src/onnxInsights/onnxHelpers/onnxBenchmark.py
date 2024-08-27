@@ -542,7 +542,7 @@ class ONNXInference:
                         profiling: bool = False,
                         disable_thread_spinning: bool = True,
                         runtime: int = 60,
-                        num_threads: int = 8,
+                        num_threads: int = 4,
                         inf_mode: str = 'fp32',
                         verbosity: int = 3,
                         intra_threads: int = 1
@@ -590,17 +590,17 @@ class ONNXInference:
         # ryzen-ai := int8 on ryzen ai processor
         if inf_mode == 'ryzen-ai':
             if layout == '1x4':
+                num_of_npu_runners = min(self.instance_count, 8)
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_Nx4_Overlay.xclbin')
-                num_of_dpu_runners = str(min(self.instance_count, 8))
 
             elif layout == '4x4':
+                num_of_npu_runners = min(self.instance_count, 2)
                 os.environ['XLNX_VART_FIRMWARE'] = os.path.join(self.xclbin_dir, 'AMD_AIE2P_4x4_Overlay.xclbin')
-                num_of_dpu_runners = str(min(self.instance_count, 2))
 
             else:
                 raise Exception("Invalid Layout parameter: should be 1x4 or 4x4")
 
-            os.environ['XLNX_ENABLE_CACHE'] = '1'            
+            os.environ['XLNX_ENABLE_CACHE'] = '1'
             os.environ['XLNX_ONNX_EP_VERBOSE'] = '1' if compile_only else '0'
             os.environ['XLNX_ENABLE_STAT_LOG'] = '0'
 
@@ -623,7 +623,7 @@ class ONNXInference:
                         "config_file": config_file_path,
                         "cacheDir": self.cache_dir,
                         "cacheKey": self.model_name + '_ryzen_ai_' + str(config_file_name)[:-5],
-                        "num_of_dpu_runners": num_of_dpu_runners
+                        "num_of_dpu_runners": num_of_npu_runners
                     },
                 ],
             )
@@ -664,15 +664,13 @@ class ONNXInference:
         logger.info("Creating task queue...\n")
 
         # create a task_queue
-        with ThreadPoolExecutor(max_workers=max(num_threads, 8)) as threads:
+        with ThreadPoolExecutor(max_workers=8) as threads:
             tasks = [threads.submit(task_fn, task_queue, generate_random_data, 1, 1, 1) for _ in range(num_input_data)]
             # wait(tasks)
 
         task = functools.partial(self.start_processing_iter, ort_session, output_feed)
 
         logger.info("Starting ONNXRuntime Benchmark...\n")
-        logger.info("Minimize Terminal for Power Measurement: 15 seconds\n")
-        time.sleep(15)
 
         # run benchmark inference
         with ThreadPoolExecutor(max_workers=num_threads) as threads:
