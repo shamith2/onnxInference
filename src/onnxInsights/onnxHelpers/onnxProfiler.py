@@ -426,13 +426,14 @@ class ONNXProfiler:
             
             # parse onnx gragh for outputs data
             for node_output in node.output:
-                output_shape = self.tensor_dict[node_output]['shape']
+                if node_output:
+                    output_shape = self.tensor_dict[node_output]['shape']
 
-                if output_shape:
-                    output_names += (node_output,)
-                    output_shapes += (output_shape,)
-                    output_size += (self.tensor_dict[node_output]['size'],)
-            
+                    if output_shape:
+                        output_names += (node_output,)
+                        output_shapes += (output_shape,)
+                        output_size += (self.tensor_dict[node_output]['size'],)
+
             if output_names:
                 self.node_output_dict[node.name] = (output_names, output_shapes, output_size)
 

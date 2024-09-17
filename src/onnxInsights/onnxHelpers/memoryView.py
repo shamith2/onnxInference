@@ -365,14 +365,17 @@ class memoryView:
                     overwrite=True
                 )
 
+                self.evictKeyfromLocalMemory(key)
+                return 2
+
             else:
                 _ = self.updateCache(
                     key=key,
                     value=(-1, next_input_id, frequency, imm_cachability, memory)
                 )
 
-            self.evictKeyfromLocalMemory(key)
-            return 3
+                self.evictKeyfromLocalMemory(key)
+                return 3
 
         return 0
 
@@ -864,14 +867,22 @@ class memoryView:
             final_outputs: tuple,
             plot_memory: bool = False
     ) -> None:
+        """
+        Score Scenario:
+            1. Inputs <- Memory: score = 0.0
+            2. Weights <- Memory: score = 0.0
+            3. Evict from Cache: score = -10.0
+        """
         # memory and cache size (in MB)
         self.local_memory_size = local_memory_size
         self.cache_size = cache_size
 
+        self.score = 0.0
+
         log_memory_context = self.generate_view(
             memory_size=local_memory_size,
             save_path=os.path.join(self.plots_directory,
-                                   'local_memory_view_for_lmsz{}mb.png'.format(local_memory_size)),
+                                   'memory_view_for_lmsz{}mb.png'.format(local_memory_size)),
             plot_memory=True,
         )
 
@@ -935,7 +946,13 @@ class memoryView:
 
             # check if local memory needs to be freed
             for key in list(self.cache_context['local_memory'].keys()):
-                _ = self.checkandFreeLocalMemory(key)
+                retval = self.checkandFreeLocalMemory(key)
+
+                if retval == 2:
+                    self.score -= 5.0
+
+                elif retval == 3:
+                    self.score -= 2.0
 
             # current operator generates output
             current_outputs = list(memory_profile['outputs'].keys())
@@ -991,6 +1008,8 @@ class memoryView:
                             overwrite=False
                         )
 
+                        self.score -= 5.0
+
                     else:
                         # else cache the output
                         _ = self.updateCache(
@@ -999,6 +1018,8 @@ class memoryView:
                         )
 
                         _ = self.updateInputIndices(current_output, input_indices)
+
+                        self.score -= 2.0
 
 
             self.cache_context = self.updateDict(
@@ -1117,4 +1138,6 @@ class memoryView:
                 fig_size=(15, 12),
                 for_cache=True
             )
+
+        return self.score
 
