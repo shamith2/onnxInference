@@ -53,8 +53,8 @@ onnx_t = ONNXProfiler(
 
 
 def shape_infer():
-    # uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'rank_0_Meta-Llama-3-8B-Instruct_decoder_merged_model_fp16.onnx')
-    uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'rank_0_gemma-1.1-2b-it_decoder_merged_model_fp16.onnx')
+    uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'rank_0_Meta-Llama-3-8B-Instruct_decoder_merged_model_fp16.onnx')
+    # uninferred_llm_onnx_model_path = os.path.join(workspace, 'models', 'rank_0_gemma-1.1-2b-it_decoder_merged_model_fp16.onnx')
 
     input_shapes = [(BATCH_SIZE, SEQ_LEN), (BATCH_SIZE, MAX_LEN), (BATCH_SIZE, SEQ_LEN)]
 
@@ -100,7 +100,7 @@ local_memory_view = memoryView(
     outputs_profile='gemma1.1_2b_fp16_decodenPhase_track_output_summary.csv'
 )
 
-for local_memory_size in range(1, 40 + 1, 1):
+for local_memory_size in range(1, 20 + 1, 1):
     score = local_memory_view.run_with_cache(
         local_memory_size=local_memory_size,
         cache_size=0,
@@ -109,6 +109,7 @@ for local_memory_size in range(1, 40 + 1, 1):
     )
 
     print("Local Memory Size: {}, Score: {}".format(local_memory_size, score))
+
 
 # onnx_t.profileModelonCPU(inferred_onnx_model_path)
 

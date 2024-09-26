@@ -865,13 +865,23 @@ class memoryView:
             local_memory_size: int,
             cache_size: int,
             final_outputs: tuple,
-            plot_memory: bool = False
-    ) -> None:
+            plot_memory: Optional[bool] = False
+    ) -> float:
         """
         Score Scenario:
-            1. Inputs <- Memory: score = 0.0
-            2. Weights <- Memory: score = 0.0
-            3. Evict from Cache: score = -10.0
+            1. Inputs/Weights from Main Memory:
+                i. Inputs <- Memory: score = 0.0
+                ii. Weights <- Memory: score = 0.0
+            2. New Output:
+                i. Output is too big to fit in Local Memory or Cache: score = -10.0
+                ii. Output can be stored in Local Memory: score = +6.0
+                iii. Output cannot be stored in Local Memory but can be stored in cache: score = +2.0
+            3. Evict Output from Local Memory -> Cache or Main Memory:
+                i. Output is too big to fit in Local Memory or Cache: score = -10.0
+                ii. Output can be fit in Cache: score = -2.0
+            4. Evict Output from Cache -> Local Memory or Main Memory:
+                i. Output needs to go to Main Memory: score = -x
+                ii. Output is needed soon, push to Local Memory: score = +y
         """
         # memory and cache size (in MB)
         self.local_memory_size = local_memory_size
@@ -883,7 +893,7 @@ class memoryView:
             memory_size=local_memory_size,
             save_path=os.path.join(self.plots_directory,
                                    'memory_view_for_lmsz{}mb.png'.format(local_memory_size)),
-            plot_memory=True,
+            plot_memory=plot_memory if plot_memory else False
         )
 
         self.recalculateInputIndices(log_memory_context)
@@ -948,9 +958,13 @@ class memoryView:
             for key in list(self.cache_context['local_memory'].keys()):
                 retval = self.checkandFreeLocalMemory(key)
 
+                # output needs to be stored in main memory
+                # since it needs to be used later but cannot fit
+                # in local memory or cache
                 if retval == 2:
-                    self.score -= 5.0
+                    self.score -= 10.0
 
+                # output can be stored in cache
                 elif retval == 3:
                     self.score -= 2.0
 
@@ -994,6 +1008,7 @@ class memoryView:
                 if (self.evaluateOutput(frequency, imm_cachability) == 'local_memory'
                     and self.local_memory_used + output_memory < self.local_memory_size):
                         self.pushtoLocalMemory(current_output, output_memory)
+                        self.score += 6.0
 
                 # or stored in cache
                 else:
@@ -1008,7 +1023,7 @@ class memoryView:
                             overwrite=False
                         )
 
-                        self.score -= 5.0
+                        self.score -= 10.0
 
                     else:
                         # else cache the output
@@ -1019,7 +1034,7 @@ class memoryView:
 
                         _ = self.updateInputIndices(current_output, input_indices)
 
-                        self.score -= 2.0
+                        self.score += 2.0
 
 
             self.cache_context = self.updateDict(
@@ -1138,6 +1153,7 @@ class memoryView:
                 fig_size=(15, 12),
                 for_cache=True
             )
+
 
         return self.score
 
