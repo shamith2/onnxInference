@@ -86,8 +86,8 @@ class memoryView:
     def updateDict(
             self,
             dictionary: dict,
-            subdict: str,
-            key: str,
+            subdict: Optional[str],
+            key: Union[str, float],
             value: Any,
             overwrite: bool = True,
             add: bool = False
