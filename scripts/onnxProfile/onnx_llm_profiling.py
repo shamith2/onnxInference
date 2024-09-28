@@ -100,15 +100,15 @@ local_memory_view = memoryView(
     outputs_profile='gemma1.1_2b_fp16_decodenPhase_track_output_summary.csv'
 )
 
-for local_memory_size in range(1, 20 + 1, 1):
+for local_memory_size in [3, 40, 80]: # range(1, 20 + 1, 1):
     score = local_memory_view.run_with_cache(
         local_memory_size=local_memory_size,
         cache_size=0,
         final_outputs=('logits'),
-        plot_memory=False
+        plot_memory=True
     )
 
-    print("Local Memory Size: {}, Score: {}".format(local_memory_size, score))
+    print("Local Memory Size: {}, Score: {}\n".format(local_memory_size, score))
 
 
 # onnx_t.profileModelonCPU(inferred_onnx_model_path)

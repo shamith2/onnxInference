@@ -828,7 +828,8 @@ class memoryView:
 
         save_object = copy.deepcopy(self.log_memory_view)
 
-        self.logData(self.log_files['memory_view'], self.log_memory_view)
+        self.logData(self.log_files['memory_view'].removesuffix(self.logfile_extension) + '_lmsz{}mb'.format(str(self.memory_size)) + self.logfile_extension,
+                     self.log_memory_view)
 
         if plot_memory:
             self.log_memory_usage = []
@@ -873,11 +874,11 @@ class memoryView:
                 i. Inputs <- Memory: score = 0.0
                 ii. Weights <- Memory: score = 0.0
             2. New Output:
-                i. Output is too big to fit in Local Memory or Cache: score = -10.0
+                i. Output is too big to fit in Local Memory or Cache: score = -6.0
                 ii. Output can be stored in Local Memory: score = +6.0
                 iii. Output cannot be stored in Local Memory but can be stored in cache: score = +2.0
             3. Evict Output from Local Memory -> Cache or Main Memory:
-                i. Output is too big to fit in Local Memory or Cache: score = -10.0
+                i. Output is too big to fit in Local Memory or Cache: score = -6.0
                 ii. Output can be fit in Cache: score = -2.0
             4. Evict Output from Cache -> Local Memory or Main Memory:
                 i. Output needs to go to Main Memory: score = -x
@@ -892,7 +893,7 @@ class memoryView:
         log_memory_context = self.generate_view(
             memory_size=local_memory_size,
             save_path=os.path.join(self.plots_directory,
-                                   'memory_view_for_lmsz{}mb.png'.format(local_memory_size)),
+                                   'memory_view_for_lmsz{}mb.png'.format(local_memory_size)) if plot_memory else None,
             plot_memory=plot_memory if plot_memory else False
         )
 
@@ -962,7 +963,7 @@ class memoryView:
                 # since it needs to be used later but cannot fit
                 # in local memory or cache
                 if retval == 2:
-                    self.score -= 10.0
+                    self.score -= 6.0
 
                 # output can be stored in cache
                 elif retval == 3:
@@ -1023,7 +1024,7 @@ class memoryView:
                             overwrite=False
                         )
 
-                        self.score -= 10.0
+                        self.score -= 6.0
 
                     else:
                         # else cache the output
@@ -1079,8 +1080,23 @@ class memoryView:
 
             self.log_memory_view.append(copy.deepcopy(self.main_memory_context))
 
-        self.logData(self.log_files['cache_view'], self.log_cache_view)
-        self.logData(self.log_files['main_memory_context'], self.log_memory_view)
+        self.logData(self.log_files['cache_view'].removesuffix(self.logfile_extension) + '_csz{}mb_lmsz{}mb'.format(str(self.cache_size), str(self.memory_size)) + self.logfile_extension,
+                     self.log_cache_view)
+
+        self.logData(self.log_files['main_memory_context'].removesuffix(self.logfile_extension) + '_csz{}mb_lmsz{}mb'.format(str(self.cache_size), str(self.memory_size)) + self.logfile_extension,
+                     self.log_memory_view)
+
+
+        # log sum of sum of read and write memory for all operators
+        read_memory, write_memory, op_memory = 0.0, 0.0, 0.0
+        for entry in self.log_memory_view:
+            read_memory += entry['total_read_memory']
+            write_memory += entry['total_write_memory']
+            op_memory += (entry['total_read_memory'] + entry['total_write_memory'])
+
+        memory_print = f"Local Memory Size {int(self.local_memory_size)} MB: Total DRAM Reads: {int(read_memory)} MB, Total Writes: {int(write_memory)} MB, Total Memory: {int(op_memory)} MB"
+        logging.info(memory_print + '\n')
+
 
         if plot_memory:
             self.log_cache_memory_usage = []
