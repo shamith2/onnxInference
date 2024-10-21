@@ -135,7 +135,7 @@ class memoryView:
             self,
             frequency: int,
             imm_cachability: int
-    ) -> bool:
+    ) -> str:
         """
         Scenarios:
         +-----------+-----------------+--------------+
@@ -400,7 +400,7 @@ class memoryView:
     def updateCache(
             self,
             key: str,
-            value: tuple[int, int, int, int, float]
+            value: tuple[int, Union[str, int], int, int, float]
     ) -> int:
         operator_id, next_input_id, frequency, imm_cachability, output_memory = value
 
@@ -742,7 +742,7 @@ class memoryView:
                         overwrite=False
                     )
 
-                # output to main memory
+                # output
                 self.memory_context = self.updateDict(
                     self.memory_context,
                     subdict='outputs',
@@ -751,7 +751,7 @@ class memoryView:
                     overwrite=False
                 )
 
-                # output to main memory
+                # total memory
                 self.memory_context = self.updateDict(
                     self.memory_context,
                     subdict=None,
@@ -797,7 +797,7 @@ class memoryView:
                 else:
                     self.memory_context['weights'] = {}
 
-                # output to main memory
+                # output
                 self.memory_context = self.updateDict(
                     self.memory_context,
                     subdict='outputs',
@@ -815,7 +815,7 @@ class memoryView:
                     overwrite=False
                 )
 
-                # output to main memory
+                # total memory
                 self.memory_context = self.updateDict(
                     self.memory_context,
                     subdict=None,
