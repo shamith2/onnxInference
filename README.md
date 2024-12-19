@@ -1,4 +1,4 @@
-# onnxInsights: Insights into ONNX Models for AI Applications
+# onnxInference: Inference with ONNX Models for AI Applications
 Getting to know more about onnx models: insights into their performance and bottlenecks for practical applications and pipelines
 
 - onnxHelpers/onnxBenchmark.py = script to convert pytorch model to onnx, quantize fp32 onnx models to int8, and run benchmark inference on AMD Ryzen AI processor
