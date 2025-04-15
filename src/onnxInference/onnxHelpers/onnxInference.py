@@ -5,10 +5,12 @@ import collections
 import time
 from pathlib import Path
 
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 
 import numpy
+import torch
 import onnxruntime
+from onnxruntime_extensions import get_library_path as lib_path
 
 import logging
 
@@ -98,6 +100,18 @@ def init_NPU_Inference(
         raise Exception("Cannot find {}".format(config_file_path))
     
     return cache_dir, config_file_path, cache_key
+
+
+def inspectShape(
+        inference_session
+):
+    print("Inputs Shape:")
+    for i, input_tensor in enumerate(inference_session.get_inputs()):
+        print(f"\tInput {i}: {input_tensor.name}, Shape: {input_tensor.shape}, Type: {input_tensor.type}")
+
+    print("Outputs Shape:")
+    for i, output_tensor in enumerate(inference_session.get_outputs()):
+        print(f"\tOutput {i}: {output_tensor.name}, Shape: {output_tensor.shape}, Type: {output_tensor.type}")
 
 
 def processShape(
@@ -205,6 +219,8 @@ def init_Inference(
                 "ONNXRuntime does not support VitisAIExecutionProvider. Build ONNXRuntime appropriately")
 
     else:
+        sess_options.register_custom_ops_library(lib_path())
+
         ort_session = onnxruntime.InferenceSession(
             onnx_model_path,
             providers=['CPUExecutionProvider'],
@@ -221,7 +237,7 @@ def init_Inference(
 
 def Inference(
         ort_session: onnxruntime.InferenceSession,
-        model_inputs: tuple[Union[numpy.ndarray, onnxruntime.OrtValue]],
+        model_inputs: Iterable[Union[numpy.ndarray, onnxruntime.OrtValue]],
         memory_device: str,
         sustain_tensors: bool = False
 ) -> tuple[list[numpy.ndarray, float]]:
