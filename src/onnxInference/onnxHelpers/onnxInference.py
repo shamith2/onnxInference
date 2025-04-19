@@ -1,4 +1,13 @@
-# Implement Python functions to run ONNX Models inference using ONNXRuntime
+# File: onnxInference.py
+# Description:
+#   Implementation of helper functions for running ONNX models using ONNX Runtime.
+#   This file contains routines for creating inference pipelines, managing input/output tensors,
+#   and building prototypes.
+#
+#   Designed to enable quick, modular, plug-and-play prototyping of inference workflows
+#
+# Author: Shamith Achanta
+#
 
 import os
 import collections
