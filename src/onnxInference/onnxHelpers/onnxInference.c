@@ -466,7 +466,7 @@ static const char* ort_extensions_lib_path(void) {
     // int success = system("cd onnxruntime-extensions-" ORT_EXTENSIONS_VERSION " && CMAKE_POLICY_VERSION_MINIMUM=3.5 BUILD_FLAVOR=RelWithDebInfo ./build.sh && cd ..");
     return "onnxruntime-extensions-" ORT_EXTENSIONS_VERSION "/out/Linux/RelWithDebInfo/lib/libortextensions.so";
   #else
-    return "onnxruntime-extensions-" ORT_EXTENSIONS_VERSION "\\out\\Windows\\RelWithDebInfo\\lib\\libortextensions.dll";
+    return "onnxruntime-extensions-" ORT_EXTENSIONS_VERSION "\\out\\Windows\\RelWithDebInfo\\lib\\ortextensions.dll";
   #endif
 }
 
